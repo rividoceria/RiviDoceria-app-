@@ -769,13 +769,17 @@ export function FichaTecnicaSection({ data, onAddFicha, onUpdateFicha, onDeleteF
                     />
                   </div>
                   <div>
-                    <Label>Validade (dias)</Label>
+                    <Label>Validade (dias) *</Label>
                     <Input
                       type="number"
                       value={validadeDias}
                       onChange={(e) => setValidadeDias(e.target.value)}
                       placeholder="Ex: 7"
+                      required
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Número de dias de validade do produto
+                    </p>
                   </div>
                 </div>
               </>
@@ -816,7 +820,7 @@ export function FichaTecnicaSection({ data, onAddFicha, onUpdateFicha, onDeleteF
               <Button 
                 className="flex-1 bg-gradient-to-r from-pink-500 to-rose-500"
                 onClick={handleSubmit}
-                disabled={!nome || !categoriaId || !rendimentoQuantidade}
+                disabled={!nome || !categoriaId || !rendimentoQuantidade || (tipo === 'produto_final' && !validadeDias)}
               >
                 {editingId ? 'Atualizar' : 'Salvar'}
               </Button>
