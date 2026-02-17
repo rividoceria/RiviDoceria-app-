@@ -19,7 +19,6 @@ import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import Auth from '@/sections/Auth';
 import AuthCallback from '@/sections/AuthCallback';
 import ResetPassword from '@/sections/ResetPassword';
-import type { CategoriaConta, CategoriaProduto } from '@/types';
 
 // Componente protegido que verifica autenticação
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
