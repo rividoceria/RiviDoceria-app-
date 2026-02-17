@@ -101,8 +101,12 @@ export default function Auth() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50 p-4">
       <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-2xl shadow-xl">
         <div className="text-center">
-          <div className="mx-auto h-16 w-16 bg-gradient-to-br from-pink-400 to-purple-600 rounded-full flex items-center justify-center mb-4">
-            <span className="text-2xl">🧁</span>
+          <div className="mx-auto h-20 w-20 mb-4">
+            <img 
+              src="/logo-rivi-doceria.png" 
+              alt="Rivi Doceria" 
+              className="w-full h-full object-contain"
+            />
           </div>
           <h2 className="text-3xl font-bold text-gray-900">
             {mode === 'login' && 'Bem-vinda(o)'}
