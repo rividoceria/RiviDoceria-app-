@@ -64,16 +64,36 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
       .slice(0, 50);
   }, [producoes]);
 
-  // Calcular data de validade baseada na ficha técnica
+  // CORREÇÃO RADICAL: Calcular data de validade manualmente sem depender de bibliotecas
   const sugestaoValidade = useMemo(() => {
-    if (!fichaTecnicaId) return '';
+    if (!fichaTecnicaId || !dataProducao) return '';
+    
     const ficha = fichasTecnicas.find(f => f?.id === fichaTecnicaId);
     if (!ficha?.validadeDias) return '';
     
-    // CORREÇÃO: dataProducao + validadeDias
-    const data = new Date(dataProducao);
-    const dataSugerida = addDays(data, ficha.validadeDias);
-    return format(dataSugerida, 'yyyy-MM-dd');
+    // Extrair ano, mês, dia da string dataProducao (formato yyyy-MM-dd)
+    const [ano, mes, dia] = dataProducao.split('-').map(Number);
+    
+    // Criar data UTC para evitar problemas de fuso
+    const data = new Date(Date.UTC(ano, mes - 1, dia));
+    
+    // Adicionar os dias de validade
+    data.setUTCDate(data.getUTCDate() + ficha.validadeDias);
+    
+    // Formatar de volta para yyyy-MM-dd
+    const anoResult = data.getUTCFullYear();
+    const mesResult = String(data.getUTCMonth() + 1).padStart(2, '0');
+    const diaResult = String(data.getUTCDate()).padStart(2, '0');
+    
+    const resultado = `${anoResult}-${mesResult}-${diaResult}`;
+    
+    // DEBUG - remover depois
+    console.log('=== CÁLCULO DE VALIDADE ===');
+    console.log('Data produção:', dataProducao);
+    console.log('Dias validade:', ficha.validadeDias);
+    console.log('Data calculada:', resultado);
+    
+    return resultado;
   }, [fichaTecnicaId, dataProducao, fichasTecnicas]);
 
   // Usar sugestão
@@ -91,12 +111,11 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
     
     const custoTotal = (ficha.custoUnidade || 0) * parseInt(quantidade);
     
-    // CORREÇÃO: Usar EXATAMENTE as datas que estão nos campos
     onAddProducao({
       fichaTecnicaId,
       quantidadeProduzida: parseInt(quantidade),
-      dataProducao: dataProducao, // Usa a data do campo
-      dataValidade: dataValidade, // Usa a data do campo
+      dataProducao: dataProducao,
+      dataValidade: dataValidade,
       custoTotal,
       observacao,
     });
@@ -203,12 +222,12 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
                   />
                 </div>
                 
-                {/* Sugestão - só aparece se não tiver data preenchida */}
+                {/* Sugestão - calculada manualmente sem fuso horário */}
                 {fichaTecnicaId && sugestaoValidade && !dataValidade && (
                   <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
                     <Calendar className="w-4 h-4 text-blue-600" />
                     <p className="text-sm text-blue-700 flex-1">
-                      Sugestão: {format(new Date(sugestaoValidade), 'dd/MM/yyyy')}
+                      Sugestão: {format(new Date(sugestaoValidade + 'T12:00:00'), 'dd/MM/yyyy')}
                     </p>
                     <Button 
                       variant="outline" 
@@ -221,12 +240,12 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
                   </div>
                 )}
 
-                {/* Data selecionada - mostra a data atual */}
+                {/* Data selecionada */}
                 {dataValidade && (
                   <div className="p-3 bg-amber-50 rounded-lg flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-amber-600" />
                     <span className="text-sm text-amber-700">
-                      Validade: {format(new Date(dataValidade), 'dd/MM/yyyy')}
+                      Validade: {format(new Date(dataValidade + 'T12:00:00'), 'dd/MM/yyyy')}
                     </span>
                   </div>
                 )}
@@ -302,7 +321,6 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
                     if (!producao) return null;
                     const ficha = fichasTecnicas.find(f => f?.id === producao.fichaTecnicaId);
                     
-                    // Calcular status de validade com a data salva
                     const { status, diasRestantes } = calcularStatusValidade(producao.dataValidade);
                     
                     const statusConfig = {
@@ -318,12 +336,12 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-gray-900 truncate">{ficha?.nome || 'Produto não encontrado'}</p>
                           <p className="text-sm text-gray-500">
-                            Produção: {format(new Date(producao.dataProducao), 'dd/MM/yyyy')} • {producao.quantidadeProduzida} unidades
+                            Produção: {format(new Date(producao.dataProducao + 'T12:00:00'), 'dd/MM/yyyy')} • {producao.quantidadeProduzida} unidades
                           </p>
                           {producao.dataValidade && (
                             <p className={`text-xs mt-1 flex items-center gap-1 ${config.text}`}>
                               <Calendar className="w-3 h-3" />
-                              Validade: {format(new Date(producao.dataValidade), 'dd/MM/yyyy')}
+                              Validade: {format(new Date(producao.dataValidade + 'T12:00:00'), 'dd/MM/yyyy')}
                               {config.label && <span className="font-bold">{config.label}</span>}
                               {status === 'valido' && diasRestantes > 0 && ` (${diasRestantes} dias restantes)`}
                               {status === 'proximo' && ` (${diasRestantes} dias restantes)`}
