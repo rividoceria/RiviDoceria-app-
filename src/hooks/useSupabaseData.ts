@@ -53,7 +53,7 @@ const convertFichaTecnica = (item: any): FichaTecnica => ({
   nome: item.nome,
   tipo: item.tipo,
   categoriaId: item.categoria_id,
-  receitaBaseId: item.receita_base_id || undefined,
+  receitasBaseIds: item.receita_base_id || undefined,
   itens: item.itens || [],
   itensEmbalagem: item.itens_embalagem || [],
   rendimentoQuantidade: item.rendimento_quantidade,
@@ -321,7 +321,7 @@ export function useSupabaseData(user: User | null) {
         nome: ficha.nome,
         tipo: ficha.tipo,
         categoria_id: ficha.categoriaId,
-        receita_base_id: ficha.receitaBaseId,
+        receitasBaseIds: ficha.receitaBaseId,
         itens: ficha.itens,
         itens_embalagem: ficha.itensEmbalagem,
         rendimento_quantidade: ficha.rendimentoQuantidade,
@@ -350,7 +350,7 @@ export function useSupabaseData(user: User | null) {
       const updateData: any = {};
       if (updates.nome) updateData.nome = updates.nome;
       if (updates.categoriaId) updateData.categoria_id = updates.categoriaId;
-      if (updates.receitaBaseId !== undefined) updateData.receita_base_id = updates.receitaBaseId;
+     if (updates.receitasBaseIds !== undefined) updateData.receita_base_id = updates.receitasBaseIds;
       if (updates.itens) updateData.itens = updates.itens;
       if (updates.itensEmbalagem) updateData.itens_embalagem = updates.itensEmbalagem;
       if (updates.rendimentoQuantidade !== undefined) updateData.rendimento_quantidade = updates.rendimentoQuantidade;
