@@ -221,8 +221,8 @@ export function useCalculations(data: SistemaData) {
     let custoTotal = 0;
 
     // Se tiver receita base, incluir o custo dela
-    if (ficha.receitaBaseId) {
-      const receitaBase = data.fichasTecnicas.find(f => f.id === ficha.receitaBaseId);
+    if (ficha.receitasBaseIds) {
+      const receitaBase = data.fichasTecnicas.find(f => f.id === ficha.receitasBaseIds);
       if (receitaBase) {
         custoTotal += receitaBase.custoTotal;
       }
