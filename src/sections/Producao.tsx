@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { formatCurrency, formatNumber, formatDate } from '@/lib/format';
 import type { SistemaData, Producao } from '@/types';
 import { useCalculations } from '@/hooks/useCalculations';
-import { format, addDays, differenceInDays, parseISO } from 'date-fns';
+import { format, addDays, differenceInDays } from 'date-fns';
 
 interface ProducaoProps {
   data: SistemaData;
