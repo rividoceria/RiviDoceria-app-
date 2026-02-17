@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { formatCurrency, formatNumber } from '@/lib/format';
 import type { SistemaData, Producao } from '@/types';
 import { useCalculations } from '@/hooks/useCalculations';
-import { format, addDays, differenceInDays } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 
 interface ProducaoProps {
   data: SistemaData;
@@ -86,12 +86,6 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
     const diaResult = String(data.getUTCDate()).padStart(2, '0');
     
     const resultado = `${anoResult}-${mesResult}-${diaResult}`;
-    
-    // DEBUG - remover depois
-    console.log('=== CÁLCULO DE VALIDADE ===');
-    console.log('Data produção:', dataProducao);
-    console.log('Dias validade:', ficha.validadeDias);
-    console.log('Data calculada:', resultado);
     
     return resultado;
   }, [fichaTecnicaId, dataProducao, fichasTecnicas]);
