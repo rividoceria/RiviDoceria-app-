@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Plus, Trash2, Edit2, ChefHat, Package, Box } from 'lucide-react';
+import { Plus, Trash2, Edit2, ChefHat, Package, Box, X } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,7 +36,7 @@ export function FichaTecnicaSection({ data, onAddFicha, onUpdateFicha, onDeleteF
   const [nome, setNome] = useState('');
   const [tipo, setTipo] = useState<TipoProduto>('receita_base');
   const [categoriaId, setCategoriaId] = useState('');
-  const [receitaBaseId, setReceitaBaseId] = useState<string>('');
+  const [receitasBaseIds, setReceitasBaseIds] = useState<string[]>([]);
   const [itens, setItens] = useState<ItemFichaTecnica[]>([]);
   const [itensEmbalagem, setItensEmbalagem] = useState<ItemFichaTecnica[]>([]);
   const [rendimentoQuantidade, setRendimentoQuantidade] = useState('');
@@ -66,16 +66,18 @@ export function FichaTecnicaSection({ data, onAddFicha, onUpdateFicha, onDeleteF
     [fichasTecnicas]
   );
 
-  // Calcular custo total incluindo receita base
+  // Calcular custo total incluindo receitas base selecionadas
   const custoTotal = useMemo(() => {
     let custo = 0;
     
-    // Custo da receita base selecionada
-    if (receitaBaseId) {
-      const receitaBase = fichasTecnicas.find(f => f?.id === receitaBaseId);
-      if (receitaBase) {
-        custo += receitaBase.custoTotal || 0;
-      }
+    // Custo das receitas base selecionadas (múltiplas)
+    if (receitasBaseIds && receitasBaseIds.length > 0) {
+      receitasBaseIds.forEach(id => {
+        const receitaBase = fichasTecnicas.find(f => f?.id === id);
+        if (receitaBase) {
+          custo += receitaBase.custoTotal || 0;
+        }
+      });
     }
     
     // Custo dos ingredientes adicionais
@@ -99,7 +101,7 @@ export function FichaTecnicaSection({ data, onAddFicha, onUpdateFicha, onDeleteF
     }, 0);
     
     return custo;
-  }, [itens, itensEmbalagem, receitaBaseId, fichasTecnicas, ingredientes]);
+  }, [itens, itensEmbalagem, receitasBaseIds, fichasTecnicas, ingredientes]);
 
   const custoUnidade = useMemo(() => {
     const rendimento = parseFloat(rendimentoQuantidade) || 1;
@@ -117,6 +119,15 @@ export function FichaTecnicaSection({ data, onAddFicha, onUpdateFicha, onDeleteF
     if (preco <= 0 || custoUnidade <= 0) return 0;
     return (custoUnidade / preco) * 100;
   }, [precoVenda, custoUnidade]);
+
+  // Custo total das receitas base selecionadas
+  const custoReceitasBase = useMemo(() => {
+    if (!receitasBaseIds || receitasBaseIds.length === 0) return 0;
+    return receitasBaseIds.reduce((total, id) => {
+      const receita = fichasTecnicas.find(f => f?.id === id);
+      return total + (receita?.custoTotal || 0);
+    }, 0);
+  }, [receitasBaseIds, fichasTecnicas]);
 
   const handleAddItem = () => {
     if (!ingredienteId || !quantidadeItem) return;
@@ -150,6 +161,19 @@ export function FichaTecnicaSection({ data, onAddFicha, onUpdateFicha, onDeleteF
     }
   };
 
+  // Adicionar ou remover receita base
+  const toggleReceitaBase = (receitaId: string) => {
+    if (receitasBaseIds.includes(receitaId)) {
+      setReceitasBaseIds(prev => prev.filter(id => id !== receitaId));
+    } else {
+      setReceitasBaseIds(prev => [...prev, receitaId]);
+    }
+  };
+
+  const removeReceitaBase = (receitaId: string) => {
+    setReceitasBaseIds(prev => prev.filter(id => id !== receitaId));
+  };
+
   const handleSubmit = () => {
     if (!nome || !categoriaId || !rendimentoQuantidade) return;
 
@@ -157,7 +181,7 @@ export function FichaTecnicaSection({ data, onAddFicha, onUpdateFicha, onDeleteF
       nome,
       tipo,
       categoriaId,
-      receitaBaseId: receitaBaseId || undefined,
+      receitasBaseIds: receitasBaseIds.length > 0 ? receitasBaseIds : undefined,
       itens: itens || [],
       itensEmbalagem: itensEmbalagem || [],
       rendimentoQuantidade: parseFloat(rendimentoQuantidade) || 1,
@@ -186,7 +210,7 @@ export function FichaTecnicaSection({ data, onAddFicha, onUpdateFicha, onDeleteF
     setNome('');
     setTipo('receita_base');
     setCategoriaId('');
-    setReceitaBaseId('');
+    setReceitasBaseIds([]);
     setItens([]);
     setItensEmbalagem([]);
     setRendimentoQuantidade('');
@@ -202,7 +226,7 @@ export function FichaTecnicaSection({ data, onAddFicha, onUpdateFicha, onDeleteF
     setNome(ficha.nome || '');
     setTipo(ficha.tipo || 'receita_base');
     setCategoriaId(ficha.categoriaId || '');
-    setReceitaBaseId(ficha.receitaBaseId || '');
+    setReceitasBaseIds(ficha.receitasBaseIds || []);
     setItens(ficha.itens || []);
     setItensEmbalagem(ficha.itensEmbalagem || []);
     setRendimentoQuantidade(ficha.rendimentoQuantidade?.toString() || '');
@@ -226,9 +250,9 @@ export function FichaTecnicaSection({ data, onAddFicha, onUpdateFicha, onDeleteF
     if (!ficha) return null;
     
     const categoria = categoriasProduto.find(c => c?.id === ficha.categoriaId);
-    const receitaBase = ficha.receitaBaseId 
-      ? fichasTecnicas.find(f => f?.id === ficha.receitaBaseId)
-      : null;
+    const receitasBaseVinculadas = (ficha.receitasBaseIds || [])
+      .map(id => fichasTecnicas.find(f => f?.id === id))
+      .filter(Boolean);
     
     return (
       <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setViewingFicha(ficha)}>
@@ -245,12 +269,17 @@ export function FichaTecnicaSection({ data, onAddFicha, onUpdateFicha, onDeleteF
                     {categoria.nome}
                   </span>
                 )}
-                {receitaBase && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 whitespace-nowrap">
-                    Base: {receitaBase.nome}
-                  </span>
-                )}
               </div>
+              {/* Mostrar múltiplas receitas base */}
+              {receitasBaseVinculadas.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {receitasBaseVinculadas.map((receita, idx) => (
+                    <span key={idx} className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 whitespace-nowrap">
+                      Base: {receita?.nome}
+                    </span>
+                  ))}
+                </div>
+              )}
               <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                 <p className="text-gray-500">
                   Custo: <span className="font-medium text-gray-700">{formatCurrency(ficha.custoTotal || 0)}</span>
@@ -345,13 +374,22 @@ export function FichaTecnicaSection({ data, onAddFicha, onUpdateFicha, onDeleteF
                 </div>
               </div>
               
-              {/* Receita Base */}
-              {viewingFicha.receitaBaseId && (
+              {/* Receitas Base (múltiplas) */}
+              {(viewingFicha.receitasBaseIds || []).length > 0 && (
                 <div className="p-3 bg-blue-50 rounded-lg">
-                  <p className="text-sm text-blue-600 font-medium">Usa Receita Base:</p>
-                  <p className="text-gray-900">
-                    {fichasTecnicas.find(f => f?.id === viewingFicha.receitaBaseId)?.nome || 'Não encontrada'}
+                  <p className="text-sm text-blue-600 font-medium mb-2">
+                    Receitas Base ({viewingFicha.receitasBaseIds?.length}):
                   </p>
+                  <div className="space-y-1">
+                    {(viewingFicha.receitasBaseIds || []).map((id, idx) => {
+                      const receita = fichasTecnicas.find(f => f?.id === id);
+                      return receita ? (
+                        <p key={idx} className="text-gray-900 text-sm">
+                          • {receita.nome} ({formatCurrency(receita.custoTotal || 0)})
+                        </p>
+                      ) : null;
+                    })}
+                  </div>
                 </div>
               )}
               
@@ -481,25 +519,84 @@ export function FichaTecnicaSection({ data, onAddFicha, onUpdateFicha, onDeleteF
               />
             </div>
 
-            {/* Seleção de Receita Base */}
-{tipo === 'produto_final' && (
-  <div>
-    <Label>Receita Base (opcional)</Label>
-    <Select value={receitaBaseId || "none"} onValueChange={(v) => setReceitaBaseId(v === "none" ? "" : v)}>
-      <SelectTrigger>
-        <SelectValue placeholder={receitasBase.length === 0 ? "Nenhuma receita base cadastrada" : "Selecione uma receita base"} />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="none">Nenhuma</SelectItem>
-        {receitasBase.map((receita) => (
-          <SelectItem key={receita.id} value={String(receita.id)}>
-            {receita.nome} ({formatCurrency(receita.custoTotal || 0)})
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  </div>
-)}
+            {/* Seleção de Múltiplas Receitas Base */}
+            {tipo === 'produto_final' && (
+              <div className="space-y-2">
+                <Label>Receitas Base (opcional)</Label>
+                <div className="border rounded-lg p-3 space-y-3">
+                  {/* Receitas selecionadas (chips) */}
+                  {receitasBaseIds.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {receitasBaseIds.map((id) => {
+                        const receita = receitasBase.find(r => r?.id === id);
+                        return receita ? (
+                          <span
+                            key={id}
+                            className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-sm px-2 py-1 rounded-full"
+                          >
+                            {receita.nome}
+                            <button
+                              onClick={() => removeReceitaBase(id)}
+                              className="ml-1 text-blue-600 hover:text-blue-800"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ) : null;
+                      })}
+                    </div>
+                  )}
+                  
+                  {/* Lista de receitas disponíveis */}
+                  <div className="max-h-40 overflow-y-auto space-y-1">
+                    {receitasBase.length === 0 ? (
+                      <p className="text-sm text-gray-500 text-center py-2">
+                        Nenhuma receita base cadastrada
+                      </p>
+                    ) : (
+                      receitasBase.map((receita) => {
+                        const isSelected = receitasBaseIds.includes(receita.id);
+                        return (
+                          <div
+                            key={receita.id}
+                            onClick={() => toggleReceitaBase(receita.id)}
+                            className={`
+                              flex items-center justify-between p-2 rounded cursor-pointer
+                              ${isSelected ? 'bg-blue-50 border border-blue-200' : 'hover:bg-gray-50'}
+                            `}
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className={`
+                                w-4 h-4 rounded border flex items-center justify-center
+                                ${isSelected ? 'bg-blue-500 border-blue-500' : 'border-gray-300'}
+                              `}>
+                                {isSelected && <span className="text-white text-xs">✓</span>}
+                              </div>
+                              <span className={`text-sm ${isSelected ? 'font-medium text-blue-900' : 'text-gray-700'}`}>
+                                {receita.nome}
+                              </span>
+                            </div>
+                            <span className="text-sm text-gray-500">
+                              {formatCurrency(receita.custoTotal || 0)}
+                            </span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                  
+                  {/* Custo total das receitas selecionadas */}
+                  {receitasBaseIds.length > 0 && (
+                    <div className="pt-2 border-t text-sm text-gray-600">
+                      Custo total das receitas base: 
+                      <span className="font-semibold text-gray-800 ml-1">
+                        {formatCurrency(custoReceitasBase)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Adicionar Ingredientes/Embalagens */}
             <div className="border rounded-lg p-4 space-y-3">
