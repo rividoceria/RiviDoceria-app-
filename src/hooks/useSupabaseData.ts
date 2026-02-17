@@ -321,7 +321,7 @@ export function useSupabaseData(user: User | null) {
         nome: ficha.nome,
         tipo: ficha.tipo,
         categoria_id: ficha.categoriaId,
-        receitasBaseIds: ficha.receitaBaseId,
+        receitasBaseIds: ficha.receitasBaseIds,
         itens: ficha.itens,
         itens_embalagem: ficha.itensEmbalagem,
         rendimento_quantidade: ficha.rendimentoQuantidade,
