@@ -8,11 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { formatCurrency, formatNumber, formatDate } from '@/lib/format';
+import { formatCurrency, formatNumber } from '@/lib/format';
 import type { SistemaData, Producao } from '@/types';
 import { useCalculations } from '@/hooks/useCalculations';
 import { format, addDays, differenceInDays } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 
 interface ProducaoProps {
   data: SistemaData;
