@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Percent, DollarSign, Tag, FolderOpen, Plus, Trash2, TrendingUp, PieChart, Download, Store, Image } from 'lucide-react';
+import { Percent, DollarSign, Tag, FolderOpen, Plus, Trash2, TrendingUp, PieChart, Download, Store, Image, Edit2, Save, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,8 +14,10 @@ interface ConfiguracoesProps {
   data: SistemaData;
   onUpdateConfig: (config: Partial<Configuracoes>) => void;
   onAddCategoriaConta: (categoria: Omit<CategoriaConta, 'id'>) => void;
+  onUpdateCategoriaConta: (id: string, categoria: Partial<CategoriaConta>) => void;
   onDeleteCategoriaConta: (id: string) => void;
   onAddCategoriaProduto: (categoria: Omit<CategoriaProduto, 'id'>) => void;
+  onUpdateCategoriaProduto: (id: string, categoria: Partial<CategoriaProduto>) => void;
   onDeleteCategoriaProduto: (id: string) => void;
 }
 
@@ -23,18 +25,30 @@ export function ConfiguracoesSection({
   data, 
   onUpdateConfig, 
   onAddCategoriaConta,
+  onUpdateCategoriaConta,
   onDeleteCategoriaConta,
   onAddCategoriaProduto,
+  onUpdateCategoriaProduto,
   onDeleteCategoriaProduto,
 }: ConfiguracoesProps) {
   const [activeTab, setActiveTab] = useState('geral');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [dialogType, setDialogType] = useState<'custoFixo' | 'custoVariavel' | 'categoriaConta' | 'categoriaProduto'>('custoFixo');
+  const [dialogType, setDialogType] = useState<'categoriaConta' | 'categoriaProduto'>('categoriaConta');
+  const [editandoCategoria, setEditandoCategoria] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Form states
+  // Estados para custos fixos (separados)
+  const [nomeFixo, setNomeFixo] = useState('');
+  const [valorFixo, setValorFixo] = useState('');
+  const [editandoFixo, setEditandoFixo] = useState<string | null>(null);
+  
+  // Estados para custos variáveis (separados)
+  const [nomeVariavel, setNomeVariavel] = useState('');
+  const [valorVariavel, setValorVariavel] = useState('');
+  const [editandoVariavel, setEditandoVariavel] = useState<string | null>(null);
+  
+  // Estados para categorias
   const [nome, setNome] = useState('');
-  const [valor, setValor] = useState('');
   const [cor, setCor] = useState('#f472b6');
   const [tipo, setTipo] = useState<'fixa' | 'variavel'>('fixa');
   const [limiteGasto, setLimiteGasto] = useState('');
@@ -42,17 +56,19 @@ export function ConfiguracoesSection({
 
   const { configuracoes, categoriasConta, categoriasProduto } = data;
 
+  // ========== CUSTOS FIXOS ==========
   const handleAddCustoFixo = () => {
-    if (!nome || !valor) return;
+    if (!nomeFixo || !valorFixo) return;
     const novoCusto: CustoFixo = {
       id: crypto.randomUUID(),
-      nome,
-      valor: parseFloat(valor),
+      nome: nomeFixo,
+      valor: parseFloat(valorFixo),
     };
     onUpdateConfig({
       custosFixos: [...(configuracoes.custosFixos || []), novoCusto],
     });
-    resetForm();
+    setNomeFixo('');
+    setValorFixo('');
   };
 
   const handleDeleteCustoFixo = (id: string) => {
@@ -61,17 +77,44 @@ export function ConfiguracoesSection({
     });
   };
 
+  const handleEditCustoFixo = (custo: CustoFixo) => {
+    setEditandoFixo(custo.id);
+    setNomeFixo(custo.nome);
+    setValorFixo(custo.valor.toString());
+  };
+
+  const handleSaveEditFixo = (id: string) => {
+    if (!nomeFixo || !valorFixo) return;
+    const custosAtualizados = (configuracoes.custosFixos || []).map(custo => 
+      custo.id === id 
+        ? { ...custo, nome: nomeFixo, valor: parseFloat(valorFixo) }
+        : custo
+    );
+    onUpdateConfig({ custosFixos: custosAtualizados });
+    setEditandoFixo(null);
+    setNomeFixo('');
+    setValorFixo('');
+  };
+
+  const cancelEditFixo = () => {
+    setEditandoFixo(null);
+    setNomeFixo('');
+    setValorFixo('');
+  };
+
+  // ========== CUSTOS VARIÁVEIS ==========
   const handleAddCustoVariavel = () => {
-    if (!nome || !valor) return;
+    if (!nomeVariavel || !valorVariavel) return;
     const novoCusto: CustoVariavel = {
       id: crypto.randomUUID(),
-      nome,
-      valor: parseFloat(valor),
+      nome: nomeVariavel,
+      valor: parseFloat(valorVariavel),
     };
     onUpdateConfig({
       custosVariaveis: [...(configuracoes.custosVariaveis || []), novoCusto],
     });
-    resetForm();
+    setNomeVariavel('');
+    setValorVariavel('');
   };
 
   const handleDeleteCustoVariavel = (id: string) => {
@@ -80,6 +123,32 @@ export function ConfiguracoesSection({
     });
   };
 
+  const handleEditCustoVariavel = (custo: CustoVariavel) => {
+    setEditandoVariavel(custo.id);
+    setNomeVariavel(custo.nome);
+    setValorVariavel(custo.valor.toString());
+  };
+
+  const handleSaveEditVariavel = (id: string) => {
+    if (!nomeVariavel || !valorVariavel) return;
+    const custosAtualizados = (configuracoes.custosVariaveis || []).map(custo => 
+      custo.id === id 
+        ? { ...custo, nome: nomeVariavel, valor: parseFloat(valorVariavel) }
+        : custo
+    );
+    onUpdateConfig({ custosVariaveis: custosAtualizados });
+    setEditandoVariavel(null);
+    setNomeVariavel('');
+    setValorVariavel('');
+  };
+
+  const cancelEditVariavel = () => {
+    setEditandoVariavel(null);
+    setNomeVariavel('');
+    setValorVariavel('');
+  };
+
+  // ========== CATEGORIAS DE CONTAS ==========
   const handleAddCategoriaConta = () => {
     if (!nome) return;
     onAddCategoriaConta({
@@ -88,10 +157,36 @@ export function ConfiguracoesSection({
       limiteGasto: limiteGasto ? parseFloat(limiteGasto) : undefined,
       cor,
     });
-    resetForm();
+    resetCategoriaForm();
     setIsDialogOpen(false);
   };
 
+  const handleEditCategoriaConta = (categoria: CategoriaConta) => {
+    setEditandoCategoria(categoria.id);
+    setNome(categoria.nome);
+    setTipo(categoria.tipo);
+    setLimiteGasto(categoria.limiteGasto?.toString() || '');
+    setCor(categoria.cor || '#f472b6');
+  };
+
+  const handleSaveEditCategoriaConta = (id: string) => {
+    if (!nome) return;
+    onUpdateCategoriaConta(id, {
+      nome,
+      tipo,
+      limiteGasto: limiteGasto ? parseFloat(limiteGasto) : undefined,
+      cor,
+    });
+    setEditandoCategoria(null);
+    resetCategoriaForm();
+  };
+
+  const cancelEditCategoria = () => {
+    setEditandoCategoria(null);
+    resetCategoriaForm();
+  };
+
+  // ========== CATEGORIAS DE PRODUTOS ==========
   const handleAddCategoriaProduto = () => {
     if (!nome || !margemPadrao) return;
     onAddCategoriaProduto({
@@ -99,8 +194,26 @@ export function ConfiguracoesSection({
       margemPadrao: parseFloat(margemPadrao),
       cor,
     });
-    resetForm();
+    resetCategoriaForm();
     setIsDialogOpen(false);
+  };
+
+  const handleEditCategoriaProduto = (categoria: CategoriaProduto) => {
+    setEditandoCategoria(categoria.id);
+    setNome(categoria.nome);
+    setMargemPadrao(categoria.margemPadrao.toString());
+    setCor(categoria.cor || '#f472b6');
+  };
+
+  const handleSaveEditCategoriaProduto = (id: string) => {
+    if (!nome || !margemPadrao) return;
+    onUpdateCategoriaProduto(id, {
+      nome,
+      margemPadrao: parseFloat(margemPadrao),
+      cor,
+    });
+    setEditandoCategoria(null);
+    resetCategoriaForm();
   };
 
   // Backup manual - Exportar JSON
@@ -144,18 +257,17 @@ export function ConfiguracoesSection({
     reader.readAsDataURL(file);
   };
 
-  const resetForm = () => {
+  const resetCategoriaForm = () => {
     setNome('');
-    setValor('');
     setCor('#f472b6');
     setTipo('fixa');
     setLimiteGasto('');
     setMargemPadrao('');
   };
 
-  const openDialog = (type: typeof dialogType) => {
+  const openDialog = (type: 'categoriaConta' | 'categoriaProduto') => {
     setDialogType(type);
-    resetForm();
+    resetCategoriaForm();
     setIsDialogOpen(true);
   };
 
@@ -163,6 +275,10 @@ export function ConfiguracoesSection({
     '#f472b6', '#60a5fa', '#34d399', '#fbbf24', '#a78bfa',
     '#f87171', '#22d3ee', '#fb923c', '#e879f9', '#84cc16',
   ];
+
+  // Totais
+  const totalFixos = (configuracoes.custosFixos || []).reduce((acc, c) => acc + (c?.valor || 0), 0);
+  const totalVariaveis = (configuracoes.custosVariaveis || []).reduce((acc, c) => acc + (c?.valor || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -192,30 +308,29 @@ export function ConfiguracoesSection({
             </div>
             
             {dialogType === 'categoriaConta' && (
-              <div>
-                <Label>Tipo</Label>
-                <select 
-                  value={tipo} 
-                  onChange={(e) => setTipo(e.target.value as 'fixa' | 'variavel')}
-                  className="w-full p-2 border rounded-md"
-                >
-                  <option value="fixa">Fixa</option>
-                  <option value="variavel">Variável</option>
-                </select>
-              </div>
-            )}
-            
-            {dialogType === 'categoriaConta' && (
-              <div>
-                <Label>Limite de Gasto (opcional)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={limiteGasto}
-                  onChange={(e) => setLimiteGasto(e.target.value)}
-                  placeholder="0,00"
-                />
-              </div>
+              <>
+                <div>
+                  <Label>Tipo</Label>
+                  <select 
+                    value={tipo} 
+                    onChange={(e) => setTipo(e.target.value as 'fixa' | 'variavel')}
+                    className="w-full p-2 border rounded-md"
+                  >
+                    <option value="fixa">Fixa</option>
+                    <option value="variavel">Variável</option>
+                  </select>
+                </div>
+                <div>
+                  <Label>Limite de Gasto (opcional)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={limiteGasto}
+                    onChange={(e) => setLimiteGasto(e.target.value)}
+                    placeholder="0,00"
+                  />
+                </div>
+              </>
             )}
             
             {dialogType === 'categoriaProduto' && (
@@ -445,46 +560,85 @@ export function ConfiguracoesSection({
                 <DollarSign className="w-5 h-5 text-blue-500" />
                 Custos Fixos Mensais
               </CardTitle>
-              <div className="text-sm text-gray-500">
-                Total: {formatCurrency((configuracoes.custosFixos || []).reduce((acc, c) => acc + (c?.valor || 0), 0))}
+              <div className="text-sm font-semibold text-blue-600">
+                Total: {formatCurrency(totalFixos)}
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex gap-2">
+              {/* Lista de custos fixos */}
+              <div className="space-y-2">
+                {(configuracoes.custosFixos || []).map((custo) => (
+                  <div key={custo.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    {editandoFixo === custo.id ? (
+                      // Modo edição
+                      <div className="flex-1 flex gap-2">
+                        <Input
+                          value={nomeFixo}
+                          onChange={(e) => setNomeFixo(e.target.value)}
+                          placeholder="Nome"
+                          className="flex-1"
+                        />
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={valorFixo}
+                          onChange={(e) => setValorFixo(e.target.value)}
+                          placeholder="Valor"
+                          className="w-32"
+                        />
+                        <Button size="sm" variant="ghost" onClick={() => handleSaveEditFixo(custo.id)}>
+                          <Save className="w-4 h-4 text-green-600" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={cancelEditFixo}>
+                          <X className="w-4 h-4 text-red-600" />
+                        </Button>
+                      </div>
+                    ) : (
+                      // Modo visualização
+                      <>
+                        <span className="font-medium">{custo.nome}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="font-semibold">{formatCurrency(custo.valor)}</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleEditCustoFixo(custo)}
+                          >
+                            <Edit2 className="w-4 h-4 text-blue-600" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDeleteCustoFixo(custo.id)}
+                          >
+                            <Trash2 className="w-4 h-4 text-red-600" />
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Input para novo custo fixo */}
+              <div className="flex gap-2 pt-2 border-t">
                 <Input
-                  placeholder="Nome do custo"
-                  value={nome}
-                  onChange={(e) => setNome(e.target.value)}
+                  placeholder="Nome do custo fixo"
+                  value={nomeFixo}
+                  onChange={(e) => setNomeFixo(e.target.value)}
+                  className="flex-1"
                 />
                 <Input
                   type="number"
                   step="0.01"
                   placeholder="Valor"
-                  value={valor}
-                  onChange={(e) => setValor(e.target.value)}
+                  value={valorFixo}
+                  onChange={(e) => setValorFixo(e.target.value)}
                   className="w-32"
                 />
-                <Button onClick={handleAddCustoFixo} disabled={!nome || !valor}>
+                <Button onClick={handleAddCustoFixo} disabled={!nomeFixo || !valorFixo}>
                   <Plus className="w-4 h-4" />
                 </Button>
-              </div>
-              <div className="space-y-2">
-                {(configuracoes.custosFixos || []).map((custo) => (
-                  <div key={custo?.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                    <span>{custo?.nome || ''}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{formatCurrency(custo?.valor || 0)}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-red-500"
-                        onClick={() => handleDeleteCustoFixo(custo?.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
               </div>
             </CardContent>
           </Card>
@@ -496,46 +650,85 @@ export function ConfiguracoesSection({
                 <DollarSign className="w-5 h-5 text-orange-500" />
                 Custos Variáveis Mensais
               </CardTitle>
-              <div className="text-sm text-gray-500">
-                Total: {formatCurrency((configuracoes.custosVariaveis || []).reduce((acc, c) => acc + (c?.valor || 0), 0))}
+              <div className="text-sm font-semibold text-orange-600">
+                Total: {formatCurrency(totalVariaveis)}
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex gap-2">
+              {/* Lista de custos variáveis */}
+              <div className="space-y-2">
+                {(configuracoes.custosVariaveis || []).map((custo) => (
+                  <div key={custo.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    {editandoVariavel === custo.id ? (
+                      // Modo edição
+                      <div className="flex-1 flex gap-2">
+                        <Input
+                          value={nomeVariavel}
+                          onChange={(e) => setNomeVariavel(e.target.value)}
+                          placeholder="Nome"
+                          className="flex-1"
+                        />
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={valorVariavel}
+                          onChange={(e) => setValorVariavel(e.target.value)}
+                          placeholder="Valor"
+                          className="w-32"
+                        />
+                        <Button size="sm" variant="ghost" onClick={() => handleSaveEditVariavel(custo.id)}>
+                          <Save className="w-4 h-4 text-green-600" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={cancelEditVariavel}>
+                          <X className="w-4 h-4 text-red-600" />
+                        </Button>
+                      </div>
+                    ) : (
+                      // Modo visualização
+                      <>
+                        <span className="font-medium">{custo.nome}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="font-semibold">{formatCurrency(custo.valor)}</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleEditCustoVariavel(custo)}
+                          >
+                            <Edit2 className="w-4 h-4 text-blue-600" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDeleteCustoVariavel(custo.id)}
+                          >
+                            <Trash2 className="w-4 h-4 text-red-600" />
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Input para novo custo variável */}
+              <div className="flex gap-2 pt-2 border-t">
                 <Input
-                  placeholder="Nome do custo"
-                  value={nome}
-                  onChange={(e) => setNome(e.target.value)}
+                  placeholder="Nome do custo variável"
+                  value={nomeVariavel}
+                  onChange={(e) => setNomeVariavel(e.target.value)}
+                  className="flex-1"
                 />
                 <Input
                   type="number"
                   step="0.01"
                   placeholder="Valor"
-                  value={valor}
-                  onChange={(e) => setValor(e.target.value)}
+                  value={valorVariavel}
+                  onChange={(e) => setValorVariavel(e.target.value)}
                   className="w-32"
                 />
-                <Button onClick={handleAddCustoVariavel} disabled={!nome || !valor}>
+                <Button onClick={handleAddCustoVariavel} disabled={!nomeVariavel || !valorVariavel}>
                   <Plus className="w-4 h-4" />
                 </Button>
-              </div>
-              <div className="space-y-2">
-                {(configuracoes.custosVariaveis || []).map((custo) => (
-                  <div key={custo?.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                    <span>{custo?.nome || ''}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{formatCurrency(custo?.valor || 0)}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-red-500"
-                        onClick={() => handleDeleteCustoVariavel(custo?.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
               </div>
             </CardContent>
           </Card>
@@ -593,38 +786,89 @@ export function ConfiguracoesSection({
               </CardTitle>
               <Button size="sm" onClick={() => openDialog('categoriaConta')}>
                 <Plus className="w-4 h-4 mr-1" />
-                Nova
+                Nova Categoria
               </Button>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
                 {(categoriasConta || []).map((cat) => (
-                  <div key={cat?.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div 
-                        className="w-4 h-4 rounded"
-                        style={{ backgroundColor: cat?.cor || '#ccc' }}
-                      />
-                      <div>
-                        <span className="font-medium">{cat?.nome || ''}</span>
-                        <span className="text-xs text-gray-500 ml-2">({cat?.tipo || ''})</span>
+                  <div key={cat.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    {editandoCategoria === cat.id ? (
+                      // Modo edição
+                      <div className="flex-1 flex flex-wrap gap-2">
+                        <Input
+                          value={nome}
+                          onChange={(e) => setNome(e.target.value)}
+                          placeholder="Nome"
+                          className="flex-1"
+                        />
+                        <select 
+                          value={tipo} 
+                          onChange={(e) => setTipo(e.target.value as 'fixa' | 'variavel')}
+                          className="w-32 p-2 border rounded-md"
+                        >
+                          <option value="fixa">Fixa</option>
+                          <option value="variavel">Variável</option>
+                        </select>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={limiteGasto}
+                          onChange={(e) => setLimiteGasto(e.target.value)}
+                          placeholder="Limite"
+                          className="w-32"
+                        />
+                        <div className="flex items-center gap-1">
+                          {colors.slice(0, 4).map((c) => (
+                            <button
+                              key={c}
+                              onClick={() => setCor(c)}
+                              className={`w-6 h-6 rounded-full border-2 ${cor === c ? 'border-gray-900' : 'border-transparent'}`}
+                              style={{ backgroundColor: c }}
+                            />
+                          ))}
+                        </div>
+                        <Button size="sm" variant="ghost" onClick={() => handleSaveEditCategoriaConta(cat.id)}>
+                          <Save className="w-4 h-4 text-green-600" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={cancelEditCategoria}>
+                          <X className="w-4 h-4 text-red-600" />
+                        </Button>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      {cat?.limiteGasto && (
-                        <span className="text-sm text-gray-500">
-                          Limite: {formatCurrency(cat.limiteGasto)}
-                        </span>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-red-500"
-                        onClick={() => onDeleteCategoriaConta(cat?.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
+                    ) : (
+                      // Modo visualização
+                      <>
+                        <div className="flex items-center gap-3">
+                          <div 
+                            className="w-4 h-4 rounded"
+                            style={{ backgroundColor: cat.cor || '#ccc' }}
+                          />
+                          <span className="font-medium">{cat.nome}</span>
+                          <span className="text-xs text-gray-500">({cat.tipo})</span>
+                          {cat.limiteGasto && (
+                            <span className="text-sm text-gray-500">
+                              Limite: {formatCurrency(cat.limiteGasto)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleEditCategoriaConta(cat)}
+                          >
+                            <Edit2 className="w-4 h-4 text-blue-600" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onDeleteCategoriaConta(cat.id)}
+                          >
+                            <Trash2 className="w-4 h-4 text-red-600" />
+                          </Button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
@@ -641,33 +885,78 @@ export function ConfiguracoesSection({
               </CardTitle>
               <Button size="sm" onClick={() => openDialog('categoriaProduto')}>
                 <Plus className="w-4 h-4 mr-1" />
-                Nova
+                Nova Categoria
               </Button>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
                 {(categoriasProduto || []).map((cat) => (
-                  <div key={cat?.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div 
-                        className="w-4 h-4 rounded"
-                        style={{ backgroundColor: cat?.cor || '#ccc' }}
-                      />
-                      <span className="font-medium">{cat?.nome || ''}</span>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <span className="text-sm text-gray-500">
-                        Margem padrão: {formatPercentage(cat?.margemPadrao || 0)}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-red-500"
-                        onClick={() => onDeleteCategoriaProduto(cat?.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
+                  <div key={cat.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    {editandoCategoria === cat.id ? (
+                      // Modo edição
+                      <div className="flex-1 flex flex-wrap gap-2">
+                        <Input
+                          value={nome}
+                          onChange={(e) => setNome(e.target.value)}
+                          placeholder="Nome"
+                          className="flex-1"
+                        />
+                        <Input
+                          type="number"
+                          step="0.1"
+                          value={margemPadrao}
+                          onChange={(e) => setMargemPadrao(e.target.value)}
+                          placeholder="Margem %"
+                          className="w-32"
+                        />
+                        <div className="flex items-center gap-1">
+                          {colors.slice(0, 4).map((c) => (
+                            <button
+                              key={c}
+                              onClick={() => setCor(c)}
+                              className={`w-6 h-6 rounded-full border-2 ${cor === c ? 'border-gray-900' : 'border-transparent'}`}
+                              style={{ backgroundColor: c }}
+                            />
+                          ))}
+                        </div>
+                        <Button size="sm" variant="ghost" onClick={() => handleSaveEditCategoriaProduto(cat.id)}>
+                          <Save className="w-4 h-4 text-green-600" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={cancelEditCategoria}>
+                          <X className="w-4 h-4 text-red-600" />
+                        </Button>
+                      </div>
+                    ) : (
+                      // Modo visualização
+                      <>
+                        <div className="flex items-center gap-3">
+                          <div 
+                            className="w-4 h-4 rounded"
+                            style={{ backgroundColor: cat.cor || '#ccc' }}
+                          />
+                          <span className="font-medium">{cat.nome}</span>
+                          <span className="text-sm text-gray-500">
+                            Margem: {formatPercentage(cat.margemPadrao)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleEditCategoriaProduto(cat)}
+                          >
+                            <Edit2 className="w-4 h-4 text-blue-600" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onDeleteCategoriaProduto(cat.id)}
+                          >
+                            <Trash2 className="w-4 h-4 text-red-600" />
+                          </Button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
