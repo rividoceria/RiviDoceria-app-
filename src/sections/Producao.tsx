@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { formatCurrency, formatNumber, formatDate } from '@/lib/format';
 import type { SistemaData, Producao } from '@/types';
 import { useCalculations } from '@/hooks/useCalculations';
-import { format, addDays, differenceInDays } from 'date-fns';
+import { format, addDays, differenceInDays, parseISO } from 'date-fns';
 
 interface ProducaoProps {
   data: SistemaData;
@@ -46,7 +46,7 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
   const [fichaTecnicaId, setFichaTecnicaId] = useState('');
   const [quantidade, setQuantidade] = useState('');
   const [dataProducao, setDataProducao] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [dataValidadeManual, setDataValidadeManual] = useState('');
+  const [dataValidade, setDataValidade] = useState('');
   const [observacao, setObservacao] = useState('');
 
   // Garantir que os arrays existam com proteção máxima
@@ -64,19 +64,27 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
       .slice(0, 50);
   }, [producoes]);
 
-  // Calcular data de validade baseada na ficha técnica
-  const dataValidadeCalculada = useMemo(() => {
+  // Calcular data de validade baseada na ficha técnica (SÓ PARA SUGESTÃO)
+  const sugestaoValidade = useMemo(() => {
     if (!fichaTecnicaId) return '';
     const ficha = fichasTecnicas.find(f => f?.id === fichaTecnicaId);
     if (!ficha?.validadeDias) return '';
-    return format(addDays(new Date(dataProducao), ficha.validadeDias), 'yyyy-MM-dd');
+    
+    // Calcula a data de validade: dataProducao + validadeDias
+    const data = new Date(dataProducao);
+    const dataSugerida = addDays(data, ficha.validadeDias);
+    return format(dataSugerida, 'yyyy-MM-dd');
   }, [fichaTecnicaId, dataProducao, fichasTecnicas]);
 
-  // Data de validade final (calculada ou manual)
-  const dataValidadeFinal = dataValidadeManual || dataValidadeCalculada;
+  // Usar sugestão automática quando selecionar produto
+  const aplicarSugestaoValidade = () => {
+    if (sugestaoValidade) {
+      setDataValidade(sugestaoValidade);
+    }
+  };
 
   const handleSubmit = () => {
-    if (!fichaTecnicaId || !quantidade) return;
+    if (!fichaTecnicaId || !quantidade || !dataValidade) return;
     
     const ficha = fichasTecnicas.find(f => f?.id === fichaTecnicaId);
     if (!ficha) return;
@@ -87,7 +95,7 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
       fichaTecnicaId,
       quantidadeProduzida: parseInt(quantidade),
       dataProducao,
-      dataValidade: dataValidadeFinal || undefined,
+      dataValidade: dataValidade, // USA A DATA SELECIONADA, não recalcula
       custoTotal,
       observacao,
     });
@@ -95,7 +103,7 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
     // Reset form
     setFichaTecnicaId('');
     setQuantidade('');
-    setDataValidadeManual('');
+    setDataValidade('');
     setObservacao('');
     setIsDialogOpen(false);
   };
@@ -188,23 +196,36 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
                   <Label>Data de Validade *</Label>
                   <Input
                     type="date"
-                    value={dataValidadeFinal}
-                    onChange={(e) => setDataValidadeManual(e.target.value)}
-                    placeholder={dataValidadeCalculada || 'Selecione a data de validade'}
+                    value={dataValidade}
+                    onChange={(e) => setDataValidade(e.target.value)}
+                    placeholder="Selecione a data de validade"
                     required
                   />
-                  {fichaTecnicaId && dataValidadeCalculada && !dataValidadeManual && (
-                    <p className="text-xs text-blue-600 mt-1">
-                      Validade sugerida baseada na ficha técnica: {formatDate(dataValidadeCalculada)}
-                    </p>
-                  )}
                 </div>
                 
-                {fichaTecnicaId && dataValidadeFinal && (
+                {/* Sugestão automática */}
+                {fichaTecnicaId && sugestaoValidade && !dataValidade && (
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-blue-600">
+                      Sugestão: {formatDate(sugestaoValidade)}
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={aplicarSugestaoValidade}
+                      className="text-xs"
+                    >
+                      Usar esta data
+                    </Button>
+                  </div>
+                )}
+
+                {/* Mostrar data selecionada */}
+                {dataValidade && (
                   <div className="p-3 bg-amber-50 rounded-lg flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-amber-600" />
                     <span className="text-sm text-amber-700">
-                      Validade: {formatDate(dataValidadeFinal)}
+                      Validade selecionada: {formatDate(dataValidade)}
                     </span>
                   </div>
                 )}
@@ -237,7 +258,7 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
                   <Button 
                     className="flex-1 bg-gradient-to-r from-pink-500 to-rose-500"
                     onClick={handleSubmit}
-                    disabled={!fichaTecnicaId || !quantidade || !dataValidadeFinal}
+                    disabled={!fichaTecnicaId || !quantidade || !dataValidade}
                   >
                     Salvar
                   </Button>
