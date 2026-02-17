@@ -101,7 +101,7 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
   };
 
   const produtosFinais = useMemo(() => 
-    fichasTecnicas.filter(f => f?.tipo === 'produto_final'),
+    fichasTecnicas.filter(f => f?.tipo === 'produto_final' && f?.validadeDias),
     [fichasTecnicas]
   );
 
@@ -132,7 +132,7 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
                 <Alert className="bg-amber-50 border-amber-200">
                   <AlertCircle className="w-4 h-4 text-amber-600" />
                   <AlertDescription className="text-amber-700">
-                    Nenhum produto cadastrado para produção. Cadastre um produto final na Ficha Técnica primeiro.
+                    Nenhum produto com validade cadastrada. Cadastre produtos finais com validade na Ficha Técnica primeiro.
                   </AlertDescription>
                 </Alert>
                 <Button 
@@ -185,16 +185,17 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
                 
                 {/* Data de Validade */}
                 <div>
-                  <Label>Data de Validade</Label>
+                  <Label>Data de Validade *</Label>
                   <Input
                     type="date"
                     value={dataValidadeFinal}
                     onChange={(e) => setDataValidadeManual(e.target.value)}
                     placeholder={dataValidadeCalculada || 'Selecione a data de validade'}
+                    required
                   />
                   {fichaTecnicaId && dataValidadeCalculada && !dataValidadeManual && (
                     <p className="text-xs text-blue-600 mt-1">
-                      Validade sugerida baseada na ficha técnica
+                      Validade sugerida baseada na ficha técnica: {formatDate(dataValidadeCalculada)}
                     </p>
                   )}
                 </div>
@@ -236,7 +237,7 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
                   <Button 
                     className="flex-1 bg-gradient-to-r from-pink-500 to-rose-500"
                     onClick={handleSubmit}
-                    disabled={!fichaTecnicaId || !quantidade}
+                    disabled={!fichaTecnicaId || !quantidade || !dataValidadeFinal}
                   >
                     Salvar
                   </Button>
