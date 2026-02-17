@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { MainLayout, type ModuleType } from '@/components/layout/MainLayout';
 import { Dashboard } from '@/sections/Dashboard';
 import { CaixaDiario } from '@/sections/CaixaDiario';
@@ -14,9 +15,64 @@ import { ConfiguracoesSection } from '@/sections/Configuracoes';
 import { useStorage } from '@/hooks/useStorage';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import Auth from '@/sections/Auth';
+import AuthCallback from '@/sections/AuthCallback';
+import ResetPassword from '@/sections/ResetPassword';
 
-function App() {
+// Componente protegido que verifica autenticação
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  const location = useLocation();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-600 rounded-xl flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <span className="text-white font-bold text-xl">D</span>
+          </div>
+          <p className="text-gray-600">Carregando DoceGestão...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  return <>{children}</>;
+}
+
+// Componente que redireciona se já estiver logado
+function PublicRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-600 rounded-xl flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <span className="text-white font-bold text-xl">D</span>
+          </div>
+          <p className="text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (user) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+// Componente principal do app (conteúdo protegido)
+function MainApp() {
   const [currentModule, setCurrentModule] = useState<ModuleType>('dashboard');
+  const { signOut } = useAuth();
   const {
     data,
     isLoaded,
@@ -168,11 +224,48 @@ function App() {
         currentModule={currentModule} 
         onModuleChange={setCurrentModule}
         configuracoes={data?.configuracoes}
+        onLogout={signOut}
       >
         {renderModule()}
       </MainLayout>
       <Toaster position="top-right" richColors />
     </>
+  );
+}
+
+// App principal com rotas
+function App() {
+  return (
+    <AuthProvider>
+      <Router>
+        <Routes>
+          {/* Rotas públicas */}
+          <Route 
+            path="/login" 
+            element={
+              <PublicRoute>
+                <Auth />
+              </PublicRoute>
+            } 
+          />
+          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/auth/reset-password" element={<ResetPassword />} />
+          
+          {/* Rota principal protegida */}
+          <Route 
+            path="/" 
+            element={
+              <ProtectedRoute>
+                <MainApp />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* Redireciona rotas desconhecidas */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Router>
+    </AuthProvider>
   );
 }
 
