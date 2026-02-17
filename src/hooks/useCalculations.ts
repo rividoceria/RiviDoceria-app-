@@ -220,13 +220,14 @@ export function useCalculations(data: SistemaData) {
 
     let custoTotal = 0;
 
-    // Se tiver receita base, incluir o custo dela
-    if (ficha.receitasBaseIds) {
-      const receitaBase = data.fichasTecnicas.find(f => f.id === ficha.receitasBaseIds);
-      if (receitaBase) {
-        custoTotal += receitaBase.custoTotal;
-      }
-    }
+   // Se tiver receitas base, incluir o custo de TODAS
+if (ficha.receitasBaseIds?.length) {
+  const custoReceitasBase = data.fichasTecnicas
+    .filter(f => ficha.receitasBaseIds!.includes(f.id))
+    .reduce((sum, f) => sum + f.custoTotal, 0);
+  
+  custoTotal += custoReceitasBase;
+}
 
     // Adicionar custo dos ingredientes adicionais
     for (const item of ficha.itens) {
