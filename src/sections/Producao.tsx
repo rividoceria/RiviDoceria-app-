@@ -12,6 +12,7 @@ import { formatCurrency, formatNumber, formatDate } from '@/lib/format';
 import type { SistemaData, Producao } from '@/types';
 import { useCalculations } from '@/hooks/useCalculations';
 import { format, addDays, differenceInDays } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface ProducaoProps {
   data: SistemaData;
@@ -64,19 +65,19 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
       .slice(0, 50);
   }, [producoes]);
 
-  // Calcular data de validade baseada na ficha técnica (SÓ PARA SUGESTÃO)
+  // Calcular data de validade baseada na ficha técnica
   const sugestaoValidade = useMemo(() => {
     if (!fichaTecnicaId) return '';
     const ficha = fichasTecnicas.find(f => f?.id === fichaTecnicaId);
     if (!ficha?.validadeDias) return '';
     
-    // Calcula a data de validade: dataProducao + validadeDias
+    // CORREÇÃO: dataProducao + validadeDias
     const data = new Date(dataProducao);
     const dataSugerida = addDays(data, ficha.validadeDias);
     return format(dataSugerida, 'yyyy-MM-dd');
   }, [fichaTecnicaId, dataProducao, fichasTecnicas]);
 
-  // Usar sugestão automática quando selecionar produto
+  // Usar sugestão
   const aplicarSugestaoValidade = () => {
     if (sugestaoValidade) {
       setDataValidade(sugestaoValidade);
@@ -91,11 +92,12 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
     
     const custoTotal = (ficha.custoUnidade || 0) * parseInt(quantidade);
     
+    // CORREÇÃO: Usar EXATAMENTE as datas que estão nos campos
     onAddProducao({
       fichaTecnicaId,
       quantidadeProduzida: parseInt(quantidade),
-      dataProducao,
-      dataValidade: dataValidade, // USA A DATA SELECIONADA, não recalcula
+      dataProducao: dataProducao, // Usa a data do campo
+      dataValidade: dataValidade, // Usa a data do campo
       custoTotal,
       observacao,
     });
@@ -198,34 +200,34 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
                     type="date"
                     value={dataValidade}
                     onChange={(e) => setDataValidade(e.target.value)}
-                    placeholder="Selecione a data de validade"
                     required
                   />
                 </div>
                 
-                {/* Sugestão automática */}
+                {/* Sugestão - só aparece se não tiver data preenchida */}
                 {fichaTecnicaId && sugestaoValidade && !dataValidade && (
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm text-blue-600">
-                      Sugestão: {formatDate(sugestaoValidade)}
+                  <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
+                    <Calendar className="w-4 h-4 text-blue-600" />
+                    <p className="text-sm text-blue-700 flex-1">
+                      Sugestão: {format(new Date(sugestaoValidade), 'dd/MM/yyyy')}
                     </p>
                     <Button 
                       variant="outline" 
                       size="sm"
                       onClick={aplicarSugestaoValidade}
-                      className="text-xs"
+                      className="text-xs bg-white"
                     >
-                      Usar esta data
+                      Usar
                     </Button>
                   </div>
                 )}
 
-                {/* Mostrar data selecionada */}
+                {/* Data selecionada - mostra a data atual */}
                 {dataValidade && (
                   <div className="p-3 bg-amber-50 rounded-lg flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-amber-600" />
                     <span className="text-sm text-amber-700">
-                      Validade selecionada: {formatDate(dataValidade)}
+                      Validade: {format(new Date(dataValidade), 'dd/MM/yyyy')}
                     </span>
                   </div>
                 )}
@@ -301,7 +303,7 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
                     if (!producao) return null;
                     const ficha = fichasTecnicas.find(f => f?.id === producao.fichaTecnicaId);
                     
-                    // Calcular status de validade
+                    // Calcular status de validade com a data salva
                     const { status, diasRestantes } = calcularStatusValidade(producao.dataValidade);
                     
                     const statusConfig = {
@@ -317,14 +319,15 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-gray-900 truncate">{ficha?.nome || 'Produto não encontrado'}</p>
                           <p className="text-sm text-gray-500">
-                            Produção: {formatDate(producao.dataProducao)} • {producao.quantidadeProduzida} unidades
+                            Produção: {format(new Date(producao.dataProducao), 'dd/MM/yyyy')} • {producao.quantidadeProduzida} unidades
                           </p>
                           {producao.dataValidade && (
                             <p className={`text-xs mt-1 flex items-center gap-1 ${config.text}`}>
                               <Calendar className="w-3 h-3" />
-                              Validade: {formatDate(producao.dataValidade)}
+                              Validade: {format(new Date(producao.dataValidade), 'dd/MM/yyyy')}
                               {config.label && <span className="font-bold">{config.label}</span>}
-                              {status === 'valido' && diasRestantes <= 5 && ` (${diasRestantes} dias restantes)`}
+                              {status === 'valido' && diasRestantes > 0 && ` (${diasRestantes} dias restantes)`}
+                              {status === 'proximo' && ` (${diasRestantes} dias restantes)`}
                             </p>
                           )}
                           {producao.observacao && (
