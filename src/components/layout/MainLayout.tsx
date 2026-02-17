@@ -12,7 +12,8 @@ import {
   BarChart3, 
   Settings,
   Menu,
-  Store
+  Store,
+  LogOut
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -36,6 +37,7 @@ interface MainLayoutProps {
   currentModule: ModuleType;
   onModuleChange: (module: ModuleType) => void;
   configuracoes?: Configuracoes;
+  onLogout?: () => void;
 }
 
 const menuItems = [
@@ -52,7 +54,7 @@ const menuItems = [
   { id: 'configuracoes' as ModuleType, label: 'Configurações', icon: Settings },
 ];
 
-export function MainLayout({ children, currentModule, onModuleChange, configuracoes }: MainLayoutProps) {
+export function MainLayout({ children, currentModule, onModuleChange, configuracoes, onLogout }: MainLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const nomeEstabelecimento = configuracoes?.nomeEstabelecimento || 'DoceGestão';
@@ -127,7 +129,16 @@ export function MainLayout({ children, currentModule, onModuleChange, configurac
         })}
       </nav>
 
-      <div className="p-4 border-t border-pink-100">
+      <div className="p-4 border-t border-pink-100 space-y-2">
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-all duration-200"
+          >
+            <LogOut className="w-5 h-5" />
+            Sair da Conta
+          </button>
+        )}
         <div className="bg-gradient-to-br from-pink-50 to-rose-50 rounded-lg p-3">
           <p className="text-xs text-gray-500 text-center">
             Controle sua doceria com inteligência
