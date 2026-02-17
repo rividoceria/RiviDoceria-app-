@@ -67,19 +67,28 @@ export function FichaTecnicaSection({ data, onAddFicha, onUpdateFicha, onDeleteF
   );
 
   // Calcular custo total incluindo receitas base selecionadas
-  const custoTotal = useMemo(() => {
-    let custo = 0;
-    
-    // Custo das receitas base selecionadas (múltiplas)
-    if (receitasBaseIds && receitasBaseIds.length > 0) {
-      receitasBaseIds.forEach(id => {
-        const receitaBase = fichasTecnicas.find(f => f?.id === id);
-        if (receitaBase) {
-          custo += receitaBase.custoTotal || 0;
-        }
-      });
-    }
-    
+const custoTotal = useMemo(() => {
+  let custo = 0;
+  
+  // Custo das receitas base selecionadas (múltiplas)
+  if (receitasBaseIds && receitasBaseIds.length > 0) {
+    receitasBaseIds.forEach(id => {
+      const receitaBase = fichasTecnicas.find(f => f?.id === id);
+      if (receitaBase) {
+        custo += receitaBase.custoTotal || 0;
+      }
+    });
+  }
+  
+    // Custo total das receitas base selecionadas
+const custoReceitasBase = useMemo(() => {
+  if (!receitasBaseIds || receitasBaseIds.length === 0) return 0;
+  return receitasBaseIds.reduce((total, id) => {
+    const receita = fichasTecnicas.find(f => f?.id === id);
+    return total + (receita?.custoTotal || 0);
+  }, 0);
+}, [receitasBaseIds, fichasTecnicas]);
+  
     // Custo dos ingredientes adicionais
     custo += (itens || []).reduce((acc, item) => {
       if (!item) return acc;
@@ -162,6 +171,19 @@ export function FichaTecnicaSection({ data, onAddFicha, onUpdateFicha, onDeleteF
   };
 
   // Adicionar ou remover receita base
+const toggleReceitaBase = (receitaId: string) => {
+  if (receitasBaseIds.includes(receitaId)) {
+    setReceitasBaseIds(prev => prev.filter(id => id !== receitaId));
+  } else {
+    setReceitasBaseIds(prev => [...prev, receitaId]);
+  }
+};
+
+const removeReceitaBase = (receitaId: string) => {
+  setReceitasBaseIds(prev => prev.filter(id => id !== receitaId));
+};
+  
+  // Adicionar ou remover receita base
   const toggleReceitaBase = (receitaId: string) => {
     if (receitasBaseIds.includes(receitaId)) {
       setReceitasBaseIds(prev => prev.filter(id => id !== receitaId));
@@ -229,7 +251,7 @@ export function FichaTecnicaSection({ data, onAddFicha, onUpdateFicha, onDeleteF
     setReceitasBaseIds(ficha.receitasBaseIds || []);
     setItens(ficha.itens || []);
     setItensEmbalagem(ficha.itensEmbalagem || []);
-    setRendimentoQuantidade(ficha.rendimentoQuantidade?.toString() || '');
+    setReceitasBaseIds(ficha.receitasBaseIds || []);
     setRendimentoUnidade(ficha.rendimentoUnidade || 'un');
     setPrecoVenda(ficha.precoVenda?.toString() || '');
     setValidadeDias(ficha.validadeDias?.toString() || '');
@@ -249,10 +271,9 @@ export function FichaTecnicaSection({ data, onAddFicha, onUpdateFicha, onDeleteF
   const FichaCard = ({ ficha }: { ficha: FichaTecnica }) => {
     if (!ficha) return null;
     
-    const categoria = categoriasProduto.find(c => c?.id === ficha.categoriaId);
-    const receitasBaseVinculadas = (ficha.receitasBaseIds || [])
-      .map(id => fichasTecnicas.find(f => f?.id === id))
-      .filter(Boolean);
+      const receitasBaseVinculadas = (ficha.receitasBaseIds || [])
+        .map(id => fichasTecnicas.find(f => f?.id === id))
+        .filter(Boolean);
     
     return (
       <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setViewingFicha(ficha)}>
