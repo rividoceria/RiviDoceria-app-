@@ -40,7 +40,7 @@ export interface FichaTecnica {
   nome: string;
   tipo: TipoProduto;
   categoriaId: string;
-  receitaBaseId?: string; // Para produtos finais que usam receita base
+  receitasBaseIds?: string[];  // Para produtos finais que usam múltiplas receitas base
   itens: ItemFichaTecnica[]; // Ingredientes adicionais (além da receita base)
   itensEmbalagem: ItemFichaTecnica[]; // Itens de embalagem
   rendimentoQuantidade: number;
