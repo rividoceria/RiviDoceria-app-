@@ -233,7 +233,7 @@ export function useStorage() {
     if (!user) return;
 
     // 1. Inserir a ficha técnica
-    const { data: fichaResult, error: fichaError } = await supabase
+    const { data: novaFicha, error: fichaError } = await supabase
       .from('fichas_tecnicas')
       .insert([{
         ...ficha,
@@ -248,9 +248,6 @@ export function useStorage() {
       console.error('Erro ao adicionar ficha técnica:', fichaError);
       return;
     }
-
-    // Usar fichaResult para criar a nova ficha
-    const novaFicha = fichaResult;
 
     // 2. Inserir os itens (ingredientes e embalagens)
     const itens = [
@@ -305,7 +302,7 @@ export function useStorage() {
     if (!user) return;
 
     // 1. Atualizar a ficha técnica
-    const { data: fichaResult, error: fichaError } = await supabase
+    const { data: fichaAtualizada, error: fichaError } = await supabase
       .from('fichas_tecnicas')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', id)
