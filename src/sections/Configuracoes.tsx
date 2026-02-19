@@ -58,26 +58,13 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
 
   const { configuracoes, categoriasConta, categoriasProduto } = data;
 
-  // ========== CARREGAR DADOS DO SUPABASE ==========
-  useEffect(() => {
-    const loadConfiguracoes = async () => {
-      if (!user) return;
-      
-      const { data: configData } = await supabase
-        .from('configuracoes')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      
-      if (configData) {
-        setTaxas(configData.taxas || { pix: 0, debito: 1.5, credito: 3.5 });
-        setCmvPercentual(configData.cmv_percentual_padrao?.toString() || '30');
-        setMargemLucro(configData.margem_lucro_padrao?.toString() || '60');
-      }
-    };
+  // ========== FUNÇÃO PARA RECARREGAR DADOS ==========
+  const reloadData = async () => {
+    if (!user) return;
     
-    loadConfiguracoes();
-  }, [user]);
+    // Forçar recarregamento dos dados (a página vai recarregar os dados do Supabase)
+    window.location.reload();
+  };
 
   // ========== CUSTOS FIXOS ==========
   const handleAddCustoFixo = async () => {
@@ -107,6 +94,9 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     setNomeFixo('');
     setValorFixo('');
     toast.success('Custo fixo adicionado com sucesso!');
+    
+    // Recarregar para garantir consistência
+    setTimeout(() => reloadData(), 500);
   };
 
   const handleDeleteCustoFixo = async (id: string) => {
@@ -127,12 +117,9 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     const novosCustosFixos = (configuracoes.custosFixos || []).filter((c: CustoFixo) => c.id !== id);
     await updateConfiguracoes({ custosFixos: novosCustosFixos });
     toast.success('Custo fixo removido!');
-  };
-
-  const handleEditCustoFixo = (custo: CustoFixo) => {
-    setEditandoFixo(custo.id);
-    setNomeFixo(custo.nome);
-    setValorFixo(custo.valor.toString());
+    
+    // Recarregar para garantir consistência
+    setTimeout(() => reloadData(), 500);
   };
 
   const handleSaveEditFixo = async (id: string) => {
@@ -164,12 +151,9 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     setNomeFixo('');
     setValorFixo('');
     toast.success('Custo fixo atualizado!');
-  };
-
-  const cancelEditFixo = () => {
-    setEditandoFixo(null);
-    setNomeFixo('');
-    setValorFixo('');
+    
+    // Recarregar para garantir consistência
+    setTimeout(() => reloadData(), 500);
   };
 
   // ========== CUSTOS VARIÁVEIS ==========
@@ -200,6 +184,9 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     setNomeVariavel('');
     setValorVariavel('');
     toast.success('Custo variável adicionado!');
+    
+    // Recarregar para garantir consistência
+    setTimeout(() => reloadData(), 500);
   };
 
   const handleDeleteCustoVariavel = async (id: string) => {
@@ -220,12 +207,9 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     const novosCustosVariaveis = (configuracoes.custosVariaveis || []).filter((c: CustoVariavel) => c.id !== id);
     await updateConfiguracoes({ custosVariaveis: novosCustosVariaveis });
     toast.success('Custo variável removido!');
-  };
-
-  const handleEditCustoVariavel = (custo: CustoVariavel) => {
-    setEditandoVariavel(custo.id);
-    setNomeVariavel(custo.nome);
-    setValorVariavel(custo.valor.toString());
+    
+    // Recarregar para garantir consistência
+    setTimeout(() => reloadData(), 500);
   };
 
   const handleSaveEditVariavel = async (id: string) => {
@@ -257,12 +241,9 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     setNomeVariavel('');
     setValorVariavel('');
     toast.success('Custo variável atualizado!');
-  };
-
-  const cancelEditVariavel = () => {
-    setEditandoVariavel(null);
-    setNomeVariavel('');
-    setValorVariavel('');
+    
+    // Recarregar para garantir consistência
+    setTimeout(() => reloadData(), 500);
   };
 
   // ========== CATEGORIAS DE CONTAS ==========
@@ -292,14 +273,9 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     resetCategoriaForm();
     setIsDialogOpen(false);
     toast.success('Categoria adicionada com sucesso!');
-  };
-
-  const handleEditCategoriaConta = (categoria: CategoriaConta) => {
-    setEditandoCategoria(categoria.id);
-    setNome(categoria.nome);
-    setTipo(categoria.tipo);
-    setLimiteGasto(categoria.limiteGasto?.toString() || '');
-    setCor(categoria.cor || '#f472b6');
+    
+    // Recarregar para garantir consistência
+    setTimeout(() => reloadData(), 500);
   };
 
   const handleSaveEditCategoriaConta = async (id: string) => {
@@ -325,11 +301,9 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     setEditandoCategoria(null);
     resetCategoriaForm();
     toast.success('Categoria atualizada!');
-  };
-
-  const cancelEditCategoria = () => {
-    setEditandoCategoria(null);
-    resetCategoriaForm();
+    
+    // Recarregar para garantir consistência
+    setTimeout(() => reloadData(), 500);
   };
 
   const handleDeleteCategoriaConta = async (id: string) => {
@@ -348,6 +322,9 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     }
 
     toast.success('Categoria deletada!');
+    
+    // Recarregar para garantir consistência
+    setTimeout(() => reloadData(), 500);
   };
 
   // ========== CATEGORIAS DE PRODUTOS ==========
@@ -376,13 +353,9 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     resetCategoriaForm();
     setIsDialogOpen(false);
     toast.success('Categoria adicionada com sucesso!');
-  };
-
-  const handleEditCategoriaProduto = (categoria: CategoriaProduto) => {
-    setEditandoCategoria(categoria.id);
-    setNome(categoria.nome);
-    setMargemPadrao(categoria.margemPadrao.toString());
-    setCor(categoria.cor || '#f472b6');
+    
+    // Recarregar para garantir consistência
+    setTimeout(() => reloadData(), 500);
   };
 
   const handleSaveEditCategoriaProduto = async (id: string) => {
@@ -407,6 +380,9 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     setEditandoCategoria(null);
     resetCategoriaForm();
     toast.success('Categoria atualizada!');
+    
+    // Recarregar para garantir consistência
+    setTimeout(() => reloadData(), 500);
   };
 
   const handleDeleteCategoriaProduto = async (id: string) => {
@@ -425,6 +401,9 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     }
 
     toast.success('Categoria deletada!');
+    
+    // Recarregar para garantir consistência
+    setTimeout(() => reloadData(), 500);
   };
 
   // ========== TAXAS ==========
