@@ -80,9 +80,9 @@ function MainApp() {
     addIngrediente,
     updateIngrediente,
     deleteIngrediente,
-    addFichaTecnica,
-    updateFichaTecnica,
-    deleteFichaTecnica,
+    // addFichaTecnica, ← REMOVIDO (não usado)
+    // updateFichaTecnica, ← REMOVIDO (não usado)
+    // deleteFichaTecnica, ← REMOVIDO (não usado)
     addProducao,
     deleteProducao,
     addTransacao,
@@ -183,7 +183,6 @@ function MainApp() {
         return (
           <FichaTecnicaSection
             data={data}
-            // Props removidas - agora usa useStorage internamente
           />
         );
       case 'producao':
