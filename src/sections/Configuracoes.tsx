@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { Percent, DollarSign, Tag, FolderOpen, Plus, Trash2, TrendingUp, PieChart, Download, Store, Image, Edit2, Save, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -61,8 +61,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
   // ========== FUNÇÃO PARA RECARREGAR DADOS ==========
   const reloadData = async () => {
     if (!user) return;
-    
-    // Forçar recarregamento dos dados (a página vai recarregar os dados do Supabase)
     window.location.reload();
   };
 
@@ -95,7 +93,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     setValorFixo('');
     toast.success('Custo fixo adicionado com sucesso!');
     
-    // Recarregar para garantir consistência
     setTimeout(() => reloadData(), 500);
   };
 
@@ -118,8 +115,13 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     await updateConfiguracoes({ custosFixos: novosCustosFixos });
     toast.success('Custo fixo removido!');
     
-    // Recarregar para garantir consistência
     setTimeout(() => reloadData(), 500);
+  };
+
+  const handleEditCustoFixo = (custo: CustoFixo) => {
+    setEditandoFixo(custo.id);
+    setNomeFixo(custo.nome);
+    setValorFixo(custo.valor.toString());
   };
 
   const handleSaveEditFixo = async (id: string) => {
@@ -152,8 +154,13 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     setValorFixo('');
     toast.success('Custo fixo atualizado!');
     
-    // Recarregar para garantir consistência
     setTimeout(() => reloadData(), 500);
+  };
+
+  const cancelEditFixo = () => {
+    setEditandoFixo(null);
+    setNomeFixo('');
+    setValorFixo('');
   };
 
   // ========== CUSTOS VARIÁVEIS ==========
@@ -185,7 +192,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     setValorVariavel('');
     toast.success('Custo variável adicionado!');
     
-    // Recarregar para garantir consistência
     setTimeout(() => reloadData(), 500);
   };
 
@@ -208,8 +214,13 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     await updateConfiguracoes({ custosVariaveis: novosCustosVariaveis });
     toast.success('Custo variável removido!');
     
-    // Recarregar para garantir consistência
     setTimeout(() => reloadData(), 500);
+  };
+
+  const handleEditCustoVariavel = (custo: CustoVariavel) => {
+    setEditandoVariavel(custo.id);
+    setNomeVariavel(custo.nome);
+    setValorVariavel(custo.valor.toString());
   };
 
   const handleSaveEditVariavel = async (id: string) => {
@@ -242,8 +253,13 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     setValorVariavel('');
     toast.success('Custo variável atualizado!');
     
-    // Recarregar para garantir consistência
     setTimeout(() => reloadData(), 500);
+  };
+
+  const cancelEditVariavel = () => {
+    setEditandoVariavel(null);
+    setNomeVariavel('');
+    setValorVariavel('');
   };
 
   // ========== CATEGORIAS DE CONTAS ==========
@@ -274,8 +290,15 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     setIsDialogOpen(false);
     toast.success('Categoria adicionada com sucesso!');
     
-    // Recarregar para garantir consistência
     setTimeout(() => reloadData(), 500);
+  };
+
+  const handleEditCategoriaConta = (categoria: CategoriaConta) => {
+    setEditandoCategoria(categoria.id);
+    setNome(categoria.nome);
+    setTipo(categoria.tipo);
+    setLimiteGasto(categoria.limiteGasto?.toString() || '');
+    setCor(categoria.cor || '#f472b6');
   };
 
   const handleSaveEditCategoriaConta = async (id: string) => {
@@ -302,7 +325,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     resetCategoriaForm();
     toast.success('Categoria atualizada!');
     
-    // Recarregar para garantir consistência
     setTimeout(() => reloadData(), 500);
   };
 
@@ -323,8 +345,12 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
 
     toast.success('Categoria deletada!');
     
-    // Recarregar para garantir consistência
     setTimeout(() => reloadData(), 500);
+  };
+
+  const cancelEditCategoria = () => {
+    setEditandoCategoria(null);
+    resetCategoriaForm();
   };
 
   // ========== CATEGORIAS DE PRODUTOS ==========
@@ -354,8 +380,14 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     setIsDialogOpen(false);
     toast.success('Categoria adicionada com sucesso!');
     
-    // Recarregar para garantir consistência
     setTimeout(() => reloadData(), 500);
+  };
+
+  const handleEditCategoriaProduto = (categoria: CategoriaProduto) => {
+    setEditandoCategoria(categoria.id);
+    setNome(categoria.nome);
+    setMargemPadrao(categoria.margemPadrao.toString());
+    setCor(categoria.cor || '#f472b6');
   };
 
   const handleSaveEditCategoriaProduto = async (id: string) => {
@@ -381,7 +413,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     resetCategoriaForm();
     toast.success('Categoria atualizada!');
     
-    // Recarregar para garantir consistência
     setTimeout(() => reloadData(), 500);
   };
 
@@ -402,7 +433,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
 
     toast.success('Categoria deletada!');
     
-    // Recarregar para garantir consistência
     setTimeout(() => reloadData(), 500);
   };
 
