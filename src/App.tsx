@@ -80,9 +80,7 @@ function MainApp() {
     addIngrediente,
     updateIngrediente,
     deleteIngrediente,
-    // addFichaTecnica, ← REMOVIDO (não usado)
-    // updateFichaTecnica, ← REMOVIDO (não usado)
-    // deleteFichaTecnica, ← REMOVIDO (não usado)
+    updateFichaTecnica, // ← MANTIDO porque é usado no Precificacao
     addProducao,
     deleteProducao,
     addTransacao,
@@ -197,7 +195,7 @@ function MainApp() {
         return (
           <Precificacao
             data={data}
-            onUpdateFicha={updateFichaTecnica}
+            onUpdateFicha={updateFichaTecnica} // ← USA updateFichaTecnica
           />
         );
       case 'relatorios':
