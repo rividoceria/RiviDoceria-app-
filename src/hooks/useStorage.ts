@@ -1,7 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { SistemaData, Configuracoes, CategoriaConta, CategoriaProduto, TransacaoDiaria } from '@/types';
-
-const STORAGE_KEY = 'docegestao_data_v2';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import type { 
+  SistemaData, 
+  Configuracoes, 
+  CategoriaConta, 
+  CategoriaProduto, 
+  TransacaoDiaria,
+  Ingrediente,
+  FichaTecnica,
+  Producao,
+  ContaPagar,
+  Meta
+} from '@/types';
 
 const defaultConfig: Configuracoes = {
   taxas: {
@@ -47,251 +58,742 @@ const defaultData: SistemaData = {
 };
 
 export function useStorage() {
+  const { user } = useAuth();
   const [data, setData] = useState<SistemaData>(defaultData);
   const [isLoaded, setIsLoaded] = useState(false);
 
+  // ========== CARREGAR DADOS DO SUPABASE ==========
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
+    async function loadData() {
+      if (!user) {
+        setIsLoaded(true);
+        return;
+      }
+
       try {
-        const parsed = JSON.parse(stored);
-        setData({ ...defaultData, ...parsed });
-      } catch (e) {
-        console.error('Erro ao carregar dados:', e);
+        // Carregar todas as tabelas em paralelo
+        const [
+          categoriasProduto,
+          categoriasConta,
+          custosFixos,
+          custosVariaveis,
+          ingredientes,
+          fichasTecnicas,
+          producoes,
+          transacoes,
+          contasPagar,
+          metas,
+          configuracoes
+        ] = await Promise.all([
+          supabase.from('categorias_produtos').select('*').eq('user_id', user.id),
+          supabase.from('categorias_contas').select('*').eq('user_id', user.id),
+          supabase.from('custos_fixos').select('*').eq('user_id', user.id),
+          supabase.from('custos_variaveis').select('*').eq('user_id', user.id),
+          supabase.from('ingredientes').select('*').eq('user_id', user.id),
+          supabase.from('fichas_tecnicas').select('*').eq('user_id', user.id),
+          supabase.from('producoes').select('*').eq('user_id', user.id),
+          supabase.from('transacoes').select('*').eq('user_id', user.id),
+          supabase.from('contas_pagar').select('*').eq('user_id', user.id),
+          supabase.from('metas').select('*').eq('user_id', user.id),
+          supabase.from('configuracoes').select('*').eq('user_id', user.id).maybeSingle()
+        ]);
+
+        // Carregar itens das fichas técnicas
+        let itensFicha: any[] = [];
+        if (fichasTecnicas.data && fichasTecnicas.data.length > 0) {
+          const fichaIds = fichasTecnicas.data.map(f => f.id);
+          const itensResult = await supabase
+            .from('itens_ficha')
+            .select('*')
+            .in('ficha_id', fichaIds);
+          itensFicha = itensResult.data || [];
+        }
+
+        // Carregar receitas base
+        let receitasBase: any[] = [];
+        if (fichasTecnicas.data && fichasTecnicas.data.length > 0) {
+          const fichaIds = fichasTecnicas.data.map(f => f.id);
+          const receitasResult = await supabase
+            .from('receitas_base_ficha')
+            .select('*')
+            .in('ficha_produto_id', fichaIds);
+          receitasBase = receitasResult.data || [];
+        }
+
+        // Montar os dados no formato esperado pelo app
+        const loadedData: SistemaData = {
+          ingredientes: ingredientes.data || [],
+          fichasTecnicas: (fichasTecnicas.data || []).map(ficha => ({
+            ...ficha,
+            itens: itensFicha.filter(item => item.ficha_id === ficha.id && item.tipo === 'ingrediente'),
+            itensEmbalagem: itensFicha.filter(item => item.ficha_id === ficha.id && item.tipo === 'embalagem'),
+            receitasBaseIds: receitasBase
+              .filter(r => r.ficha_produto_id === ficha.id)
+              .map(r => r.receita_base_id)
+          })),
+          categoriasProduto: categoriasProduto.data || defaultCategoriasProduto,
+          producoes: producoes.data || [],
+          transacoes: transacoes.data || [],
+          contasPagar: contasPagar.data || [],
+          categoriasConta: categoriasConta.data || defaultCategoriasConta,
+          metas: metas.data || [],
+          configuracoes: configuracoes.data ? {
+            ...defaultConfig,
+            ...configuracoes.data,
+            custosFixos: custosFixos.data || [],
+            custosVariaveis: custosVariaveis.data || [],
+          } : defaultConfig,
+        };
+
+        setData(loadedData);
+      } catch (error) {
+        console.error('Erro ao carregar dados do Supabase:', error);
+      } finally {
+        setIsLoaded(true);
       }
     }
-    setIsLoaded(true);
-  }, []);
 
-  useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    }
-  }, [data, isLoaded]);
+    loadData();
+  }, [user]);
 
-  const updateData = useCallback((updates: Partial<SistemaData>) => {
-    setData(prev => ({ ...prev, ...updates }));
-  }, []);
+  // ========== INGREDIENTES ==========
+  const addIngrediente = useCallback(async (ingrediente: Omit<Ingrediente, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (!user) return;
 
-  const addIngrediente = useCallback((ingrediente: Omit<typeof data.ingredientes[0], 'id' | 'createdAt' | 'updatedAt'>) => {
     const newIngrediente = {
       ...ingrediente,
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      user_id: user.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
+
+    const { data: result, error } = await supabase
+      .from('ingredientes')
+      .insert([newIngrediente])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao adicionar ingrediente:', error);
+      return;
+    }
+
     setData(prev => ({
       ...prev,
-      ingredientes: [...prev.ingredientes, newIngrediente],
+      ingredientes: [...prev.ingredientes, result],
     }));
-    return newIngrediente;
-  }, []);
 
-  const updateIngrediente = useCallback((id: string, updates: Partial<typeof data.ingredientes[0]>) => {
+    return result;
+  }, [user]);
+
+  const updateIngrediente = useCallback(async (id: string, updates: Partial<Ingrediente>) => {
+    if (!user) return;
+
+    const { data: result, error } = await supabase
+      .from('ingredientes')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao atualizar ingrediente:', error);
+      return;
+    }
+
     setData(prev => ({
       ...prev,
-      ingredientes: prev.ingredientes.map(i =>
-        i.id === id ? { ...i, ...updates, updatedAt: new Date().toISOString() } : i
-      ),
+      ingredientes: prev.ingredientes.map(i => i.id === id ? result : i),
     }));
-  }, []);
+  }, [user]);
 
-  const deleteIngrediente = useCallback((id: string) => {
+  const deleteIngrediente = useCallback(async (id: string) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('ingredientes')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Erro ao deletar ingrediente:', error);
+      return;
+    }
+
     setData(prev => ({
       ...prev,
       ingredientes: prev.ingredientes.filter(i => i.id !== id),
     }));
-  }, []);
+  }, [user]);
 
-  const addFichaTecnica = useCallback((ficha: Omit<typeof data.fichasTecnicas[0], 'id' | 'createdAt' | 'updatedAt'>) => {
-    const newFicha = {
-      ...ficha,
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+  // ========== FICHAS TÉCNICAS ==========
+  const addFichaTecnica = useCallback(async (ficha: Omit<FichaTecnica, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (!user) return;
+
+    // 1. Inserir a ficha técnica
+    const { data: fichaResult, error: fichaError } = await supabase
+      .from('fichas_tecnicas')
+      .insert([{
+        ...ficha,
+        user_id: user.id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }])
+      .select()
+      .single();
+
+    if (fichaError) {
+      console.error('Erro ao adicionar ficha técnica:', fichaError);
+      return;
+    }
+
+    // 2. Inserir os itens (ingredientes e embalagens)
+    const itens = [
+      ...(ficha.itens || []).map(item => ({ ...item, tipo: 'ingrediente' })),
+      ...(ficha.itensEmbalagem || []).map(item => ({ ...item, tipo: 'embalagem' }))
+    ];
+
+    if (itens.length > 0) {
+      const { error: itensError } = await supabase
+        .from('itens_ficha')
+        .insert(itens.map(item => ({
+          ...item,
+          ficha_id: fichaResult.id,
+        })));
+
+      if (itensError) {
+        console.error('Erro ao adicionar itens da ficha:', itensError);
+      }
+    }
+
+    // 3. Inserir receitas base
+    if (ficha.receitasBaseIds && ficha.receitasBaseIds.length > 0) {
+      const { error: receitasError } = await supabase
+        .from('receitas_base_ficha')
+        .insert(ficha.receitasBaseIds.map(receitaId => ({
+          ficha_produto_id: fichaResult.id,
+          receita_base_id: receitaId,
+        })));
+
+      if (receitasError) {
+        console.error('Erro ao adicionar receitas base:', receitasError);
+      }
+    }
+
+    // 4. Atualizar o estado local
+    const novaFicha: FichaTecnica = {
+      ...fichaResult,
+      itens: ficha.itens || [],
+      itensEmbalagem: ficha.itensEmbalagem || [],
+      receitasBaseIds: ficha.receitasBaseIds || [],
     };
-    setData(prev => ({
-      ...prev,
-      fichasTecnicas: [...prev.fichasTecnicas, newFicha],
-    }));
-    return newFicha;
-  }, []);
 
-  const updateFichaTecnica = useCallback((id: string, updates: Partial<typeof data.fichasTecnicas[0]>) => {
     setData(prev => ({
       ...prev,
-      fichasTecnicas: prev.fichasTecnicas.map(f =>
-        f.id === id ? { ...f, ...updates, updatedAt: new Date().toISOString() } : f
+      fichasTecnicas: [...prev.fichasTecnicas, novaFicha],
+    }));
+
+    return novaFicha;
+  }, [user]);
+
+  const updateFichaTecnica = useCallback(async (id: string, updates: Partial<FichaTecnica>) => {
+    if (!user) return;
+
+    // 1. Atualizar a ficha técnica
+    const { data: fichaResult, error: fichaError } = await supabase
+      .from('fichas_tecnicas')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select()
+      .single();
+
+    if (fichaError) {
+      console.error('Erro ao atualizar ficha técnica:', fichaError);
+      return;
+    }
+
+    // 2. Atualizar os itens (simplificado: deleta tudo e reinsere)
+    await supabase.from('itens_ficha').delete().eq('ficha_id', id);
+    
+    const itens = [
+      ...(updates.itens || []).map(item => ({ ...item, tipo: 'ingrediente' })),
+      ...(updates.itensEmbalagem || []).map(item => ({ ...item, tipo: 'embalagem' }))
+    ];
+
+    if (itens.length > 0) {
+      await supabase.from('itens_ficha').insert(
+        itens.map(item => ({
+          ...item,
+          ficha_id: id,
+        }))
+      );
+    }
+
+    // 3. Atualizar receitas base
+    await supabase.from('receitas_base_ficha').delete().eq('ficha_produto_id', id);
+    
+    if (updates.receitasBaseIds && updates.receitasBaseIds.length > 0) {
+      await supabase.from('receitas_base_ficha').insert(
+        updates.receitasBaseIds.map(receitaId => ({
+          ficha_produto_id: id,
+          receita_base_id: receitaId,
+        }))
+      );
+    }
+
+    // 4. Atualizar o estado local
+    setData(prev => ({
+      ...prev,
+      fichasTecnicas: prev.fichasTecnicas.map(f => 
+        f.id === id ? { ...f, ...updates } : f
       ),
     }));
-  }, []);
+  }, [user]);
 
-  const deleteFichaTecnica = useCallback((id: string) => {
+  const deleteFichaTecnica = useCallback(async (id: string) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('fichas_tecnicas')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Erro ao deletar ficha técnica:', error);
+      return;
+    }
+
     setData(prev => ({
       ...prev,
       fichasTecnicas: prev.fichasTecnicas.filter(f => f.id !== id),
     }));
-  }, []);
+  }, [user]);
 
-  const addProducao = useCallback((producao: Omit<typeof data.producoes[0], 'id' | 'createdAt'>) => {
-    const newProducao = {
-      ...producao,
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-    };
+  // ========== PRODUÇÕES ==========
+  const addProducao = useCallback(async (producao: Omit<Producao, 'id' | 'createdAt'>) => {
+    if (!user) return;
+
+    const { data: result, error } = await supabase
+      .from('producoes')
+      .insert([{
+        ...producao,
+        user_id: user.id,
+        created_at: new Date().toISOString(),
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao adicionar produção:', error);
+      return;
+    }
+
     setData(prev => ({
       ...prev,
-      producoes: [...prev.producoes, newProducao],
+      producoes: [...prev.producoes, result],
     }));
-    return newProducao;
-  }, []);
 
-  const deleteProducao = useCallback((id: string) => {
+    return result;
+  }, [user]);
+
+  const deleteProducao = useCallback(async (id: string) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('producoes')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Erro ao deletar produção:', error);
+      return;
+    }
+
     setData(prev => ({
       ...prev,
       producoes: prev.producoes.filter(p => p.id !== id),
     }));
-  }, []);
+  }, [user]);
 
-  const addTransacao = useCallback((transacao: Omit<TransacaoDiaria, 'id' | 'createdAt'>) => {
-    const newTransacao = {
-      ...transacao,
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-    };
+  // ========== TRANSAÇÕES ==========
+  const addTransacao = useCallback(async (transacao: Omit<TransacaoDiaria, 'id' | 'createdAt'>) => {
+    if (!user) return;
+
+    const { data: result, error } = await supabase
+      .from('transacoes')
+      .insert([{
+        ...transacao,
+        user_id: user.id,
+        created_at: new Date().toISOString(),
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao adicionar transação:', error);
+      return;
+    }
+
     setData(prev => ({
       ...prev,
-      transacoes: [...prev.transacoes, newTransacao],
+      transacoes: [...prev.transacoes, result],
     }));
-    return newTransacao;
-  }, []);
 
-  const deleteTransacao = useCallback((id: string) => {
+    return result;
+  }, [user]);
+
+  const deleteTransacao = useCallback(async (id: string) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('transacoes')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Erro ao deletar transação:', error);
+      return;
+    }
+
     setData(prev => ({
       ...prev,
       transacoes: prev.transacoes.filter(t => t.id !== id),
     }));
-  }, []);
+  }, [user]);
 
-  const addContaPagar = useCallback((conta: Omit<typeof data.contasPagar[0], 'id' | 'createdAt'>) => {
-    const newConta = {
-      ...conta,
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-    };
+  // ========== CONTAS A PAGAR ==========
+  const addContaPagar = useCallback(async (conta: Omit<ContaPagar, 'id' | 'createdAt'>) => {
+    if (!user) return;
+
+    const { data: result, error } = await supabase
+      .from('contas_pagar')
+      .insert([{
+        ...conta,
+        user_id: user.id,
+        created_at: new Date().toISOString(),
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao adicionar conta:', error);
+      return;
+    }
+
     setData(prev => ({
       ...prev,
-      contasPagar: [...prev.contasPagar, newConta],
+      contasPagar: [...prev.contasPagar, result],
     }));
-    return newConta;
-  }, []);
 
-  const updateContaPagar = useCallback((id: string, updates: Partial<typeof data.contasPagar[0]>) => {
+    return result;
+  }, [user]);
+
+  const updateContaPagar = useCallback(async (id: string, updates: Partial<ContaPagar>) => {
+    if (!user) return;
+
+    const { data: result, error } = await supabase
+      .from('contas_pagar')
+      .update(updates)
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao atualizar conta:', error);
+      return;
+    }
+
     setData(prev => ({
       ...prev,
-      contasPagar: prev.contasPagar.map(c =>
-        c.id === id ? { ...c, ...updates } : c
-      ),
+      contasPagar: prev.contasPagar.map(c => c.id === id ? result : c),
     }));
-  }, []);
+  }, [user]);
 
-  const deleteContaPagar = useCallback((id: string) => {
+  const deleteContaPagar = useCallback(async (id: string) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('contas_pagar')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Erro ao deletar conta:', error);
+      return;
+    }
+
     setData(prev => ({
       ...prev,
       contasPagar: prev.contasPagar.filter(c => c.id !== id),
     }));
-  }, []);
+  }, [user]);
 
-  const addMeta = useCallback((meta: Omit<typeof data.metas[0], 'id' | 'createdAt'>) => {
-    const newMeta = {
-      ...meta,
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-    };
+  // ========== METAS ==========
+  const addMeta = useCallback(async (meta: Omit<Meta, 'id' | 'createdAt'>) => {
+    if (!user) return;
+
+    const { data: result, error } = await supabase
+      .from('metas')
+      .insert([{
+        ...meta,
+        user_id: user.id,
+        created_at: new Date().toISOString(),
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao adicionar meta:', error);
+      return;
+    }
+
     setData(prev => ({
       ...prev,
-      metas: [...prev.metas, newMeta],
+      metas: [...prev.metas, result],
     }));
-    return newMeta;
-  }, []);
 
-  const updateMeta = useCallback((id: string, updates: Partial<typeof data.metas[0]>) => {
+    return result;
+  }, [user]);
+
+  const updateMeta = useCallback(async (id: string, updates: Partial<Meta>) => {
+    if (!user) return;
+
+    const { data: result, error } = await supabase
+      .from('metas')
+      .update(updates)
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao atualizar meta:', error);
+      return;
+    }
+
     setData(prev => ({
       ...prev,
-      metas: prev.metas.map(m =>
-        m.id === id ? { ...m, ...updates } : m
-      ),
+      metas: prev.metas.map(m => m.id === id ? result : m),
     }));
-  }, []);
+  }, [user]);
 
-  const deleteMeta = useCallback((id: string) => {
+  const deleteMeta = useCallback(async (id: string) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('metas')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Erro ao deletar meta:', error);
+      return;
+    }
+
     setData(prev => ({
       ...prev,
       metas: prev.metas.filter(m => m.id !== id),
     }));
-  }, []);
+  }, [user]);
 
-  const updateConfiguracoes = useCallback((config: Partial<Configuracoes>) => {
+  // ========== CONFIGURAÇÕES ==========
+  const updateConfiguracoes = useCallback(async (config: Partial<Configuracoes>) => {
+    if (!user) return;
+
+    // Separar custos fixos e variáveis
+    const { custosFixos, custosVariaveis, ...configRest } = config;
+
+    // 1. Atualizar ou inserir configurações
+    const { error: configError } = await supabase
+      .from('configuracoes')
+      .upsert({
+        user_id: user.id,
+        ...configRest,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' });
+
+    if (configError) {
+      console.error('Erro ao atualizar configurações:', configError);
+    }
+
+    // 2. Atualizar custos fixos
+    if (custosFixos) {
+      // Deletar todos e reinserir (simplificado)
+      await supabase.from('custos_fixos').delete().eq('user_id', user.id);
+      
+      if (custosFixos.length > 0) {
+        await supabase.from('custos_fixos').insert(
+          custosFixos.map(c => ({ ...c, user_id: user.id }))
+        );
+      }
+    }
+
+    // 3. Atualizar custos variáveis
+    if (custosVariaveis) {
+      await supabase.from('custos_variaveis').delete().eq('user_id', user.id);
+      
+      if (custosVariaveis.length > 0) {
+        await supabase.from('custos_variaveis').insert(
+          custosVariaveis.map(c => ({ ...c, user_id: user.id }))
+        );
+      }
+    }
+
+    // 4. Atualizar estado local
     setData(prev => ({
       ...prev,
       configuracoes: { ...prev.configuracoes, ...config },
     }));
-  }, []);
+  }, [user]);
 
-  const addCategoriaConta = useCallback((categoria: Omit<CategoriaConta, 'id'>) => {
-    const newCategoria = {
-      ...categoria,
-      id: crypto.randomUUID(),
-    };
+  // ========== CATEGORIAS DE CONTAS ==========
+  const addCategoriaConta = useCallback(async (categoria: Omit<CategoriaConta, 'id'>) => {
+    if (!user) return;
+
+    const { data: result, error } = await supabase
+      .from('categorias_contas')
+      .insert([{
+        ...categoria,
+        user_id: user.id,
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao adicionar categoria de conta:', error);
+      return;
+    }
+
     setData(prev => ({
       ...prev,
-      categoriasConta: [...prev.categoriasConta, newCategoria],
+      categoriasConta: [...prev.categoriasConta, result],
     }));
-    return newCategoria;
-  }, []);
 
-  const updateCategoriaConta = useCallback((id: string, updates: Partial<CategoriaConta>) => {
+    return result;
+  }, [user]);
+
+  const updateCategoriaConta = useCallback(async (id: string, updates: Partial<CategoriaConta>) => {
+    if (!user) return;
+
+    const { data: result, error } = await supabase
+      .from('categorias_contas')
+      .update(updates)
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao atualizar categoria de conta:', error);
+      return;
+    }
+
     setData(prev => ({
       ...prev,
-      categoriasConta: prev.categoriasConta.map(c =>
-        c.id === id ? { ...c, ...updates } : c
-      ),
+      categoriasConta: prev.categoriasConta.map(c => c.id === id ? result : c),
     }));
-  }, []);
+  }, [user]);
 
-  const deleteCategoriaConta = useCallback((id: string) => {
+  const deleteCategoriaConta = useCallback(async (id: string) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('categorias_contas')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Erro ao deletar categoria de conta:', error);
+      return;
+    }
+
     setData(prev => ({
       ...prev,
       categoriasConta: prev.categoriasConta.filter(c => c.id !== id),
     }));
-  }, []);
+  }, [user]);
 
-  const addCategoriaProduto = useCallback((categoria: Omit<CategoriaProduto, 'id'>) => {
-    const newCategoria = {
-      ...categoria,
-      id: crypto.randomUUID(),
-    };
+  // ========== CATEGORIAS DE PRODUTOS ==========
+  const addCategoriaProduto = useCallback(async (categoria: Omit<CategoriaProduto, 'id'>) => {
+    if (!user) return;
+
+    const { data: result, error } = await supabase
+      .from('categorias_produtos')
+      .insert([{
+        ...categoria,
+        user_id: user.id,
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao adicionar categoria de produto:', error);
+      return;
+    }
+
     setData(prev => ({
       ...prev,
-      categoriasProduto: [...prev.categoriasProduto, newCategoria],
+      categoriasProduto: [...prev.categoriasProduto, result],
     }));
-    return newCategoria;
-  }, []);
 
-  const updateCategoriaProduto = useCallback((id: string, updates: Partial<CategoriaProduto>) => {
+    return result;
+  }, [user]);
+
+  const updateCategoriaProduto = useCallback(async (id: string, updates: Partial<CategoriaProduto>) => {
+    if (!user) return;
+
+    const { data: result, error } = await supabase
+      .from('categorias_produtos')
+      .update(updates)
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao atualizar categoria de produto:', error);
+      return;
+    }
+
     setData(prev => ({
       ...prev,
-      categoriasProduto: prev.categoriasProduto.map(c =>
-        c.id === id ? { ...c, ...updates } : c
-      ),
+      categoriasProduto: prev.categoriasProduto.map(c => c.id === id ? result : c),
     }));
-  }, []);
+  }, [user]);
 
-  const deleteCategoriaProduto = useCallback((id: string) => {
+  const deleteCategoriaProduto = useCallback(async (id: string) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('categorias_produtos')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Erro ao deletar categoria de produto:', error);
+      return;
+    }
+
     setData(prev => ({
       ...prev,
       categoriasProduto: prev.categoriasProduto.filter(c => c.id !== id),
     }));
+  }, [user]);
+
+  // Função de updateData mantida para compatibilidade
+  const updateData = useCallback((updates: Partial<SistemaData>) => {
+    setData(prev => ({ ...prev, ...updates }));
   }, []);
 
   return {
