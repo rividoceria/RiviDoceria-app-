@@ -91,13 +91,14 @@ function MainApp() {
     addMeta,
     updateMeta,
     deleteMeta,
-    updateConfiguracoes,
-    addCategoriaConta,
-    updateCategoriaConta,
-    deleteCategoriaConta,
-    addCategoriaProduto,
-    updateCategoriaProduto,
-    deleteCategoriaProduto,
+    // Estas funções não estão sendo usadas diretamente no App
+    // updateConfiguracoes, ← REMOVIDO
+    // addCategoriaConta, ← REMOVIDO
+    // updateCategoriaConta, ← REMOVIDO
+    // deleteCategoriaConta, ← REMOVIDO
+    // addCategoriaProduto, ← REMOVIDO
+    // updateCategoriaProduto, ← REMOVIDO
+    // deleteCategoriaProduto, ← REMOVIDO
   } = useStorage();
 
   if (!isLoaded) {
@@ -203,7 +204,7 @@ function MainApp() {
       case 'configuracoes':
         return (
           <ConfiguracoesSection
-            data={data} // ← SÓ PASSA O DATA!
+            data={data}
           />
         );
       default:
