@@ -9,13 +9,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { formatCurrency, formatNumber, formatPercentage } from '@/lib/format';
+import { useStorage } from '@/hooks/useStorage'; // ← ADICIONADO
 import type { SistemaData, FichaTecnica, ItemFichaTecnica, TipoProduto, UnidadeMedida } from '@/types';
 
+// Removido as props que não são mais necessárias
 interface FichaTecnicaProps {
   data: SistemaData;
-  onAddFicha: (ficha: Omit<FichaTecnica, 'id' | 'createdAt' | 'updatedAt'>) => void;
-  onUpdateFicha: (id: string, updates: Partial<FichaTecnica>) => void;
-  onDeleteFicha: (id: string) => void;
+  // As funções agora vêm do useStorage, não por props
 }
 
 const unidadesMedida: { value: UnidadeMedida; label: string }[] = [
@@ -26,7 +26,14 @@ const unidadesMedida: { value: UnidadeMedida; label: string }[] = [
   { value: 'un', label: 'un' },
 ];
 
-export function FichaTecnicaSection({ data, onAddFicha, onUpdateFicha, onDeleteFicha }: FichaTecnicaProps) {
+export function FichaTecnicaSection({ data }: FichaTecnicaProps) {
+  // Usar o hook useStorage para acessar as funções
+  const { 
+    addFichaTecnica, 
+    updateFichaTecnica, 
+    deleteFichaTecnica 
+  } = useStorage();
+
   const [activeTab, setActiveTab] = useState('receitas');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -174,7 +181,7 @@ export function FichaTecnicaSection({ data, onAddFicha, onUpdateFicha, onDeleteF
     setReceitasBaseIds(prev => prev.filter(id => id !== receitaId));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => { // ← TORNADO ASYNC
     if (!nome || !categoriaId || !rendimentoQuantidade) return;
 
     const fichaData = {
@@ -196,10 +203,12 @@ export function FichaTecnicaSection({ data, onAddFicha, onUpdateFicha, onDeleteF
     };
 
     if (editingId) {
-      onUpdateFicha(editingId, fichaData);
+      // Usar a função do useStorage
+      await updateFichaTecnica(editingId, fichaData);
       setEditingId(null);
     } else {
-      onAddFicha(fichaData);
+      // Usar a função do useStorage
+      await addFichaTecnica(fichaData);
     }
     
     resetForm();
@@ -236,6 +245,12 @@ export function FichaTecnicaSection({ data, onAddFicha, onUpdateFicha, onDeleteF
     setDescricao(ficha.descricao || '');
     setActiveTab(ficha.tipo === 'receita_base' ? 'receitas' : 'produtos');
     setIsDialogOpen(true);
+  };
+
+  const handleDelete = async (id: string) => { // ← TORNADO ASYNC
+    if (confirm('Tem certeza que deseja excluir esta ficha técnica?')) {
+      await deleteFichaTecnica(id);
+    }
   };
 
   const handleOpenNew = (tipoInicial: TipoProduto) => {
@@ -319,7 +334,7 @@ export function FichaTecnicaSection({ data, onAddFicha, onUpdateFicha, onDeleteF
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                onClick={() => onDeleteFicha(ficha.id)}
+                onClick={() => handleDelete(ficha.id)}
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
