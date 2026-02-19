@@ -249,6 +249,9 @@ export function useStorage() {
       return;
     }
 
+    // Usar fichaResult para criar a nova ficha
+    const novaFicha = fichaResult;
+
     // 2. Inserir os itens (ingredientes e embalagens)
     const itens = [
       ...(ficha.itens || []).map(item => ({ ...item, tipo: 'ingrediente' })),
@@ -260,7 +263,7 @@ export function useStorage() {
         .from('itens_ficha')
         .insert(itens.map(item => ({
           ...item,
-          ficha_id: fichaResult.id,
+          ficha_id: novaFicha.id,
         })));
 
       if (itensError) {
@@ -273,7 +276,7 @@ export function useStorage() {
       const { error: receitasError } = await supabase
         .from('receitas_base_ficha')
         .insert(ficha.receitasBaseIds.map(receitaId => ({
-          ficha_produto_id: fichaResult.id,
+          ficha_produto_id: novaFicha.id,
           receita_base_id: receitaId,
         })));
 
@@ -283,8 +286,8 @@ export function useStorage() {
     }
 
     // 4. Atualizar o estado local
-    const novaFicha: FichaTecnica = {
-      ...fichaResult,
+    const fichaCompleta: FichaTecnica = {
+      ...novaFicha,
       itens: ficha.itens || [],
       itensEmbalagem: ficha.itensEmbalagem || [],
       receitasBaseIds: ficha.receitasBaseIds || [],
@@ -292,10 +295,10 @@ export function useStorage() {
 
     setData(prev => ({
       ...prev,
-      fichasTecnicas: [...prev.fichasTecnicas, novaFicha],
+      fichasTecnicas: [...prev.fichasTecnicas, fichaCompleta],
     }));
 
-    return novaFicha;
+    return fichaCompleta;
   }, [user]);
 
   const updateFichaTecnica = useCallback(async (id: string, updates: Partial<FichaTecnica>) => {
