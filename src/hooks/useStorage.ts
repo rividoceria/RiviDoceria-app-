@@ -122,8 +122,20 @@ export function useStorage() {
 
         // Montar os dados no formato esperado pelo app
         const loadedData: SistemaData = {
-          ingredientes: ingredientes.data || [],
-          fichasTecnicas: (fichasTecnicas.data || []).map(ficha => ({
+          ingredientes: (ingredientes.data || []).map((item: any) => ({
+            id: item.id,
+            nome: item.nome,
+            quantidadeEmbalagem: item.quantidade_embalagem,
+            unidade: item.unidade,
+            precoEmbalagem: 0, // Campo que não existe no banco
+            custoUnidade: item.custo_unidade,
+            estoqueAtual: item.quantidade_estoque,
+            estoqueMinimo: item.estoque_minimo,
+            tipo: item.tipo,
+            createdAt: item.created_at,
+            updatedAt: item.created_at, // Usando created_at como fallback
+          })),
+          fichasTecnicas: (fichasTecnicas.data || []).map((ficha: any) => ({
             ...ficha,
             itens: itensFicha.filter(item => item.ficha_id === ficha.id && item.tipo === 'ingrediente'),
             itensEmbalagem: itensFicha.filter(item => item.ficha_id === ficha.id && item.tipo === 'embalagem'),
@@ -160,11 +172,18 @@ export function useStorage() {
   const addIngrediente = useCallback(async (ingrediente: Omit<Ingrediente, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!user) return;
 
+    // Converter do formato do app para o formato do banco
     const newIngrediente = {
-      ...ingrediente,
       user_id: user.id,
+      nome: ingrediente.nome,
+      tipo: ingrediente.tipo,
+      unidade: ingrediente.unidade,
+      custo_unidade: ingrediente.custoUnidade,
+      quantidade_embalagem: ingrediente.quantidadeEmbalagem,
+      estoque_minimo: ingrediente.estoqueMinimo,
+      quantidade_estoque: ingrediente.estoqueAtual,
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      // NÃO TEM updated_at no banco
     };
 
     const { data: result, error } = await supabase
@@ -178,20 +197,45 @@ export function useStorage() {
       return;
     }
 
+    // Converter de volta para o formato do app
+    const novoIngrediente: Ingrediente = {
+      id: result.id,
+      nome: result.nome,
+      quantidadeEmbalagem: result.quantidade_embalagem,
+      unidade: result.unidade,
+      precoEmbalagem: 0, // Campo que não existe no banco
+      custoUnidade: result.custo_unidade,
+      estoqueAtual: result.quantidade_estoque,
+      estoqueMinimo: result.estoque_minimo,
+      tipo: result.tipo,
+      createdAt: result.created_at,
+      updatedAt: result.created_at,
+    };
+
     setData(prev => ({
       ...prev,
-      ingredientes: [...prev.ingredientes, result],
+      ingredientes: [...prev.ingredientes, novoIngrediente],
     }));
 
-    return result;
+    return novoIngrediente;
   }, [user]);
 
   const updateIngrediente = useCallback(async (id: string, updates: Partial<Ingrediente>) => {
     if (!user) return;
 
+    // Converter para formato do banco
+    const dbUpdates: any = {};
+    if (updates.nome !== undefined) dbUpdates.nome = updates.nome;
+    if (updates.tipo !== undefined) dbUpdates.tipo = updates.tipo;
+    if (updates.unidade !== undefined) dbUpdates.unidade = updates.unidade;
+    if (updates.custoUnidade !== undefined) dbUpdates.custo_unidade = updates.custoUnidade;
+    if (updates.quantidadeEmbalagem !== undefined) dbUpdates.quantidade_embalagem = updates.quantidadeEmbalagem;
+    if (updates.estoqueMinimo !== undefined) dbUpdates.estoque_minimo = updates.estoqueMinimo;
+    if (updates.estoqueAtual !== undefined) dbUpdates.quantidade_estoque = updates.estoqueAtual;
+
     const { data: result, error } = await supabase
       .from('ingredientes')
-      .update({ ...updates, updated_at: new Date().toISOString() })
+      .update(dbUpdates)
       .eq('id', id)
       .eq('user_id', user.id)
       .select()
@@ -202,9 +246,24 @@ export function useStorage() {
       return;
     }
 
+    // Converter de volta
+    const ingredienteAtualizado: Ingrediente = {
+      id: result.id,
+      nome: result.nome,
+      quantidadeEmbalagem: result.quantidade_embalagem,
+      unidade: result.unidade,
+      precoEmbalagem: 0,
+      custoUnidade: result.custo_unidade,
+      estoqueAtual: result.quantidade_estoque,
+      estoqueMinimo: result.estoque_minimo,
+      tipo: result.tipo,
+      createdAt: result.created_at,
+      updatedAt: result.created_at,
+    };
+
     setData(prev => ({
       ...prev,
-      ingredientes: prev.ingredientes.map(i => i.id === id ? result : i),
+      ingredientes: prev.ingredientes.map(i => i.id === id ? ingredienteAtualizado : i),
     }));
   }, [user]);
 
