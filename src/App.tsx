@@ -80,7 +80,7 @@ function MainApp() {
     addIngrediente,
     updateIngrediente,
     deleteIngrediente,
-    updateFichaTecnica, // ← MANTIDO porque é usado no Precificacao
+    updateFichaTecnica,
     addProducao,
     deleteProducao,
     addTransacao,
@@ -195,7 +195,7 @@ function MainApp() {
         return (
           <Precificacao
             data={data}
-            onUpdateFicha={updateFichaTecnica} // ← USA updateFichaTecnica
+            onUpdateFicha={updateFichaTecnica}
           />
         );
       case 'relatorios':
@@ -203,14 +203,7 @@ function MainApp() {
       case 'configuracoes':
         return (
           <ConfiguracoesSection
-            data={data}
-            onUpdateConfig={updateConfiguracoes}
-            onAddCategoriaConta={addCategoriaConta}
-            onUpdateCategoriaConta={updateCategoriaConta}
-            onDeleteCategoriaConta={deleteCategoriaConta}
-            onAddCategoriaProduto={addCategoriaProduto}
-            onUpdateCategoriaProduto={updateCategoriaProduto}
-            onDeleteCategoriaProduto={deleteCategoriaProduto}
+            data={data} // ← SÓ PASSA O DATA!
           />
         );
       default:
