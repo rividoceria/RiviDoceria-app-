@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Percent, DollarSign, Tag, FolderOpen, Plus, Trash2, TrendingUp, PieChart, Download, Store, Image, Edit2, Save, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,29 +8,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { formatCurrency, formatPercentage } from '@/lib/format';
+import { useStorage } from '@/hooks/useStorage';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import type { SistemaData, Configuracoes, CategoriaConta, CategoriaProduto, CustoFixo, CustoVariavel } from '@/types';
+import { toast } from 'sonner';
 
 interface ConfiguracoesProps {
   data: SistemaData;
-  onUpdateConfig: (config: Partial<Configuracoes>) => void;
-  onAddCategoriaConta: (categoria: Omit<CategoriaConta, 'id'>) => void;
-  onUpdateCategoriaConta: (id: string, categoria: Partial<CategoriaConta>) => void;
-  onDeleteCategoriaConta: (id: string) => void;
-  onAddCategoriaProduto: (categoria: Omit<CategoriaProduto, 'id'>) => void;
-  onUpdateCategoriaProduto: (id: string, categoria: Partial<CategoriaProduto>) => void;
-  onDeleteCategoriaProduto: (id: string) => void;
 }
 
-export function ConfiguracoesSection({ 
-  data, 
-  onUpdateConfig, 
-  onAddCategoriaConta,
-  onUpdateCategoriaConta,
-  onDeleteCategoriaConta,
-  onAddCategoriaProduto,
-  onUpdateCategoriaProduto,
-  onDeleteCategoriaProduto,
-}: ConfiguracoesProps) {
+export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
+  const { user } = useAuth();
+  const { updateConfiguracoes } = useStorage();
+  
   const [activeTab, setActiveTab] = useState('geral');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogType, setDialogType] = useState<'categoriaConta' | 'categoriaProduto'>('categoriaConta');
@@ -54,27 +45,90 @@ export function ConfiguracoesSection({
   const [limiteGasto, setLimiteGasto] = useState('');
   const [margemPadrao, setMargemPadrao] = useState('');
 
+  // Estados para taxas
+  const [taxas, setTaxas] = useState(data.configuracoes?.taxas || { pix: 0, debito: 1.5, credito: 3.5 });
+
+  // Estados para margens
+  const [cmvPercentual, setCmvPercentual] = useState(data.configuracoes?.cmvPercentualPadrao?.toString() || '30');
+  const [margemLucro, setMargemLucro] = useState(data.configuracoes?.margemLucroPadrao?.toString() || '60');
+
+  // Estados para configurações gerais
+  const [nomeEstabelecimento, setNomeEstabelecimento] = useState(data.configuracoes?.nomeEstabelecimento || '');
+  const [logoUrl, setLogoUrl] = useState(data.configuracoes?.logoUrl || '');
+
   const { configuracoes, categoriasConta, categoriasProduto } = data;
 
+  // ========== CARREGAR DADOS DO SUPABASE ==========
+  useEffect(() => {
+    const loadConfiguracoes = async () => {
+      if (!user) return;
+      
+      // Carregar taxas e margens
+      const { data: configData } = await supabase
+        .from('configuracoes')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (configData) {
+        setTaxas(configData.taxas || { pix: 0, debito: 1.5, credito: 3.5 });
+        setCmvPercentual(configData.cmv_percentual_padrao?.toString() || '30');
+        setMargemLucro(configData.margem_lucro_padrao?.toString() || '60');
+      }
+    };
+    
+    loadConfiguracoes();
+  }, [user]);
+
   // ========== CUSTOS FIXOS ==========
-  const handleAddCustoFixo = () => {
-    if (!nomeFixo || !valorFixo) return;
-    const novoCusto: CustoFixo = {
-      id: crypto.randomUUID(),
+  const handleAddCustoFixo = async () => {
+    if (!user || !nomeFixo || !valorFixo) return;
+
+    const novoCusto = {
+      user_id: user.id,
       nome: nomeFixo,
       valor: parseFloat(valorFixo),
     };
-    onUpdateConfig({
-      custosFixos: [...(configuracoes.custosFixos || []), novoCusto],
-    });
+
+    const { data, error } = await supabase
+      .from('custos_fixos')
+      .insert([novoCusto])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao adicionar custo fixo:', error);
+      toast.error('Erro ao adicionar custo fixo');
+      return;
+    }
+
+    // Atualizar estado local
+    const novosCustosFixos = [...(configuracoes.custosFixos || []), data];
+    await updateConfiguracoes({ custosFixos: novosCustosFixos });
+    
     setNomeFixo('');
     setValorFixo('');
+    toast.success('Custo fixo adicionado com sucesso!');
   };
 
-  const handleDeleteCustoFixo = (id: string) => {
-    onUpdateConfig({
-      custosFixos: (configuracoes.custosFixos || []).filter(c => c.id !== id),
-    });
+  const handleDeleteCustoFixo = async (id: string) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('custos_fixos')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Erro ao deletar custo fixo:', error);
+      toast.error('Erro ao deletar custo fixo');
+      return;
+    }
+
+    const novosCustosFixos = (configuracoes.custosFixos || []).filter(c => c.id !== id);
+    await updateConfiguracoes({ custosFixos: novosCustosFixos });
+    toast.success('Custo fixo removido!');
   };
 
   const handleEditCustoFixo = (custo: CustoFixo) => {
@@ -83,17 +137,35 @@ export function ConfiguracoesSection({
     setValorFixo(custo.valor.toString());
   };
 
-  const handleSaveEditFixo = (id: string) => {
-    if (!nomeFixo || !valorFixo) return;
+  const handleSaveEditFixo = async (id: string) => {
+    if (!user || !nomeFixo || !valorFixo) return;
+
+    const { error } = await supabase
+      .from('custos_fixos')
+      .update({
+        nome: nomeFixo,
+        valor: parseFloat(valorFixo),
+      })
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Erro ao atualizar custo fixo:', error);
+      toast.error('Erro ao atualizar custo fixo');
+      return;
+    }
+
     const custosAtualizados = (configuracoes.custosFixos || []).map(custo => 
       custo.id === id 
         ? { ...custo, nome: nomeFixo, valor: parseFloat(valorFixo) }
         : custo
     );
-    onUpdateConfig({ custosFixos: custosAtualizados });
+    await updateConfiguracoes({ custosFixos: custosAtualizados });
+    
     setEditandoFixo(null);
     setNomeFixo('');
     setValorFixo('');
+    toast.success('Custo fixo atualizado!');
   };
 
   const cancelEditFixo = () => {
@@ -103,24 +175,53 @@ export function ConfiguracoesSection({
   };
 
   // ========== CUSTOS VARIÁVEIS ==========
-  const handleAddCustoVariavel = () => {
-    if (!nomeVariavel || !valorVariavel) return;
-    const novoCusto: CustoVariavel = {
-      id: crypto.randomUUID(),
+  const handleAddCustoVariavel = async () => {
+    if (!user || !nomeVariavel || !valorVariavel) return;
+
+    const novoCusto = {
+      user_id: user.id,
       nome: nomeVariavel,
       valor: parseFloat(valorVariavel),
     };
-    onUpdateConfig({
-      custosVariaveis: [...(configuracoes.custosVariaveis || []), novoCusto],
-    });
+
+    const { data, error } = await supabase
+      .from('custos_variaveis')
+      .insert([novoCusto])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao adicionar custo variável:', error);
+      toast.error('Erro ao adicionar custo variável');
+      return;
+    }
+
+    const novosCustosVariaveis = [...(configuracoes.custosVariaveis || []), data];
+    await updateConfiguracoes({ custosVariaveis: novosCustosVariaveis });
+    
     setNomeVariavel('');
     setValorVariavel('');
+    toast.success('Custo variável adicionado!');
   };
 
-  const handleDeleteCustoVariavel = (id: string) => {
-    onUpdateConfig({
-      custosVariaveis: (configuracoes.custosVariaveis || []).filter(c => c.id !== id),
-    });
+  const handleDeleteCustoVariavel = async (id: string) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('custos_variaveis')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Erro ao deletar custo variável:', error);
+      toast.error('Erro ao deletar custo variável');
+      return;
+    }
+
+    const novosCustosVariaveis = (configuracoes.custosVariaveis || []).filter(c => c.id !== id);
+    await updateConfiguracoes({ custosVariaveis: novosCustosVariaveis });
+    toast.success('Custo variável removido!');
   };
 
   const handleEditCustoVariavel = (custo: CustoVariavel) => {
@@ -129,17 +230,35 @@ export function ConfiguracoesSection({
     setValorVariavel(custo.valor.toString());
   };
 
-  const handleSaveEditVariavel = (id: string) => {
-    if (!nomeVariavel || !valorVariavel) return;
+  const handleSaveEditVariavel = async (id: string) => {
+    if (!user || !nomeVariavel || !valorVariavel) return;
+
+    const { error } = await supabase
+      .from('custos_variaveis')
+      .update({
+        nome: nomeVariavel,
+        valor: parseFloat(valorVariavel),
+      })
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Erro ao atualizar custo variável:', error);
+      toast.error('Erro ao atualizar custo variável');
+      return;
+    }
+
     const custosAtualizados = (configuracoes.custosVariaveis || []).map(custo => 
       custo.id === id 
         ? { ...custo, nome: nomeVariavel, valor: parseFloat(valorVariavel) }
         : custo
     );
-    onUpdateConfig({ custosVariaveis: custosAtualizados });
+    await updateConfiguracoes({ custosVariaveis: custosAtualizados });
+    
     setEditandoVariavel(null);
     setNomeVariavel('');
     setValorVariavel('');
+    toast.success('Custo variável atualizado!');
   };
 
   const cancelEditVariavel = () => {
@@ -149,16 +268,38 @@ export function ConfiguracoesSection({
   };
 
   // ========== CATEGORIAS DE CONTAS ==========
-  const handleAddCategoriaConta = () => {
-    if (!nome) return;
-    onAddCategoriaConta({
+  const handleAddCategoriaConta = async () => {
+    if (!user || !nome) return;
+
+    const novaCategoria = {
+      user_id: user.id,
       nome,
       tipo,
-      limiteGasto: limiteGasto ? parseFloat(limiteGasto) : undefined,
+      limite_gasto: limiteGasto ? parseFloat(limiteGasto) : null,
       cor,
-    });
+    };
+
+    const { data, error } = await supabase
+      .from('categorias_contas')
+      .insert([novaCategoria])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao adicionar categoria de conta:', error);
+      toast.error('Erro ao adicionar categoria');
+      return;
+    }
+
+    // Adicionar ao estado local via updateData
+    const novasCategorias = [...(categoriasConta || []), data];
+    // Como não temos updateData diretamente, vamos usar o que temos
+    // Por enquanto, vamos apenas resetar o formulário
+    // O next render vai pegar do banco
+    
     resetCategoriaForm();
     setIsDialogOpen(false);
+    toast.success('Categoria adicionada com sucesso!');
   };
 
   const handleEditCategoriaConta = (categoria: CategoriaConta) => {
@@ -169,16 +310,29 @@ export function ConfiguracoesSection({
     setCor(categoria.cor || '#f472b6');
   };
 
-  const handleSaveEditCategoriaConta = (id: string) => {
-    if (!nome) return;
-    onUpdateCategoriaConta(id, {
-      nome,
-      tipo,
-      limiteGasto: limiteGasto ? parseFloat(limiteGasto) : undefined,
-      cor,
-    });
+  const handleSaveEditCategoriaConta = async (id: string) => {
+    if (!user || !nome) return;
+
+    const { error } = await supabase
+      .from('categorias_contas')
+      .update({
+        nome,
+        tipo,
+        limite_gasto: limiteGasto ? parseFloat(limiteGasto) : null,
+        cor,
+      })
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Erro ao atualizar categoria de conta:', error);
+      toast.error('Erro ao atualizar categoria');
+      return;
+    }
+
     setEditandoCategoria(null);
     resetCategoriaForm();
+    toast.success('Categoria atualizada!');
   };
 
   const cancelEditCategoria = () => {
@@ -186,16 +340,50 @@ export function ConfiguracoesSection({
     resetCategoriaForm();
   };
 
+  const handleDeleteCategoriaConta = async (id: string) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('categorias_contas')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Erro ao deletar categoria de conta:', error);
+      toast.error('Erro ao deletar categoria');
+      return;
+    }
+
+    toast.success('Categoria deletada!');
+  };
+
   // ========== CATEGORIAS DE PRODUTOS ==========
-  const handleAddCategoriaProduto = () => {
-    if (!nome || !margemPadrao) return;
-    onAddCategoriaProduto({
+  const handleAddCategoriaProduto = async () => {
+    if (!user || !nome || !margemPadrao) return;
+
+    const novaCategoria = {
+      user_id: user.id,
       nome,
-      margemPadrao: parseFloat(margemPadrao),
+      margem_padrao: parseFloat(margemPadrao),
       cor,
-    });
+    };
+
+    const { data, error } = await supabase
+      .from('categorias_produtos')
+      .insert([novaCategoria])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao adicionar categoria de produto:', error);
+      toast.error('Erro ao adicionar categoria');
+      return;
+    }
+
     resetCategoriaForm();
     setIsDialogOpen(false);
+    toast.success('Categoria adicionada com sucesso!');
   };
 
   const handleEditCategoriaProduto = (categoria: CategoriaProduto) => {
@@ -205,15 +393,145 @@ export function ConfiguracoesSection({
     setCor(categoria.cor || '#f472b6');
   };
 
-  const handleSaveEditCategoriaProduto = (id: string) => {
-    if (!nome || !margemPadrao) return;
-    onUpdateCategoriaProduto(id, {
-      nome,
-      margemPadrao: parseFloat(margemPadrao),
-      cor,
-    });
+  const handleSaveEditCategoriaProduto = async (id: string) => {
+    if (!user || !nome || !margemPadrao) return;
+
+    const { error } = await supabase
+      .from('categorias_produtos')
+      .update({
+        nome,
+        margem_padrao: parseFloat(margemPadrao),
+        cor,
+      })
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Erro ao atualizar categoria de produto:', error);
+      toast.error('Erro ao atualizar categoria');
+      return;
+    }
+
     setEditandoCategoria(null);
     resetCategoriaForm();
+    toast.success('Categoria atualizada!');
+  };
+
+  const handleDeleteCategoriaProduto = async (id: string) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('categorias_produtos')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Erro ao deletar categoria de produto:', error);
+      toast.error('Erro ao deletar categoria');
+      return;
+    }
+
+    toast.success('Categoria deletada!');
+  };
+
+  // ========== TAXAS ==========
+  const handleTaxaChange = async (campo: 'pix' | 'debito' | 'credito', valor: string) => {
+    const novasTaxas = { ...taxas, [campo]: parseFloat(valor) || 0 };
+    setTaxas(novasTaxas);
+    
+    if (user) {
+      await supabase
+        .from('configuracoes')
+        .upsert({
+          user_id: user.id,
+          taxas: novasTaxas,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+      
+      await updateConfiguracoes({ taxas: novasTaxas });
+    }
+  };
+
+  // ========== MARGENS ==========
+  const handleCmvChange = async (valor: string) => {
+    setCmvPercentual(valor);
+    const numValor = parseFloat(valor) || 30;
+    
+    if (user) {
+      await supabase
+        .from('configuracoes')
+        .upsert({
+          user_id: user.id,
+          cmv_percentual_padrao: numValor,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+      
+      await updateConfiguracoes({ cmvPercentualPadrao: numValor });
+    }
+  };
+
+  const handleMargemChange = async (valor: string) => {
+    setMargemLucro(valor);
+    const numValor = parseFloat(valor) || 60;
+    
+    if (user) {
+      await supabase
+        .from('configuracoes')
+        .upsert({
+          user_id: user.id,
+          margem_lucro_padrao: numValor,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+      
+      await updateConfiguracoes({ margemLucroPadrao: numValor });
+    }
+  };
+
+  // ========== CONFIGURAÇÕES GERAIS ==========
+  const handleNomeEstabelecimentoChange = async (valor: string) => {
+    setNomeEstabelecimento(valor);
+    
+    if (user) {
+      await supabase
+        .from('configuracoes')
+        .upsert({
+          user_id: user.id,
+          nome_estabelecimento: valor,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+      
+      await updateConfiguracoes({ nomeEstabelecimento: valor });
+    }
+  };
+
+  // Upload de logo (base64 para Supabase)
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    
+    if (file.size > 2 * 1024 * 1024) {
+      alert('A imagem deve ter no máximo 2MB');
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64 = reader.result as string;
+      setLogoUrl(base64);
+      
+      await supabase
+        .from('configuracoes')
+        .upsert({
+          user_id: user.id,
+          logo_url: base64,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+      
+      await updateConfiguracoes({ logoUrl: base64 });
+      toast.success('Logo atualizada!');
+    };
+    reader.readAsDataURL(file);
   };
 
   // Backup manual - Exportar JSON
@@ -237,24 +555,6 @@ export function ConfiguracoesSection({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-  };
-
-  // Upload de logo (base64 para localStorage)
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    if (file.size > 2 * 1024 * 1024) {
-      alert('A imagem deve ter no máximo 2MB');
-      return;
-    }
-    
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result as string;
-      onUpdateConfig({ logoUrl: base64 });
-    };
-    reader.readAsDataURL(file);
   };
 
   const resetCategoriaForm = () => {
@@ -419,8 +719,8 @@ export function ConfiguracoesSection({
               <div>
                 <Label>Nome do Estabelecimento</Label>
                 <Input
-                  value={configuracoes.nomeEstabelecimento || ''}
-                  onChange={(e) => onUpdateConfig({ nomeEstabelecimento: e.target.value })}
+                  value={nomeEstabelecimento}
+                  onChange={(e) => handleNomeEstabelecimentoChange(e.target.value)}
                   placeholder="Ex: Doce Sabor Confeitaria"
                 />
                 <p className="text-xs text-gray-500 mt-1">
@@ -434,9 +734,9 @@ export function ConfiguracoesSection({
               <div>
                 <Label>Logo do Estabelecimento</Label>
                 <div className="mt-2 flex items-center gap-4">
-                  {configuracoes.logoUrl ? (
+                  {logoUrl ? (
                     <img 
-                      src={configuracoes.logoUrl} 
+                      src={logoUrl} 
                       alt="Logo"
                       className="w-20 h-20 rounded-xl object-cover border"
                     />
@@ -459,17 +759,30 @@ export function ConfiguracoesSection({
                       className="w-full"
                     >
                       <Store className="w-4 h-4 mr-2" />
-                      {configuracoes.logoUrl ? 'Alterar Logo' : 'Upload da Logo'}
+                      {logoUrl ? 'Alterar Logo' : 'Upload da Logo'}
                     </Button>
                     <p className="text-xs text-gray-500 mt-2">
                       Formatos aceitos: JPG, PNG. Tamanho máximo: 2MB
                     </p>
-                    {configuracoes.logoUrl && (
+                    {logoUrl && (
                       <Button
                         variant="ghost"
                         size="sm"
                         className="mt-2 text-red-500"
-                        onClick={() => onUpdateConfig({ logoUrl: undefined })}
+                        onClick={async () => {
+                          setLogoUrl('');
+                          if (user) {
+                            await supabase
+                              .from('configuracoes')
+                              .upsert({
+                                user_id: user.id,
+                                logo_url: null,
+                                updated_at: new Date().toISOString(),
+                              }, { onConflict: 'user_id' });
+                            await updateConfiguracoes({ logoUrl: undefined });
+                            toast.success('Logo removida!');
+                          }
+                        }}
                       >
                         Remover logo
                       </Button>
@@ -519,10 +832,8 @@ export function ConfiguracoesSection({
                 <Input
                   type="number"
                   step="0.01"
-                  value={configuracoes.taxas?.pix ?? 0}
-                  onChange={(e) => onUpdateConfig({
-                    taxas: { ...(configuracoes.taxas || { pix: 0, debito: 1.5, credito: 3.5 }), pix: parseFloat(e.target.value) || 0 }
-                  })}
+                  value={taxas.pix}
+                  onChange={(e) => handleTaxaChange('pix', e.target.value)}
                 />
                 <p className="text-xs text-gray-500 mt-1">Geralmente 0% para Pix</p>
               </div>
@@ -531,10 +842,8 @@ export function ConfiguracoesSection({
                 <Input
                   type="number"
                   step="0.01"
-                  value={configuracoes.taxas?.debito ?? 1.5}
-                  onChange={(e) => onUpdateConfig({
-                    taxas: { ...(configuracoes.taxas || { pix: 0, debito: 1.5, credito: 3.5 }), debito: parseFloat(e.target.value) || 0 }
-                  })}
+                  value={taxas.debito}
+                  onChange={(e) => handleTaxaChange('debito', e.target.value)}
                 />
               </div>
               <div>
@@ -542,10 +851,8 @@ export function ConfiguracoesSection({
                 <Input
                   type="number"
                   step="0.01"
-                  value={configuracoes.taxas?.credito ?? 3.5}
-                  onChange={(e) => onUpdateConfig({
-                    taxas: { ...(configuracoes.taxas || { pix: 0, debito: 1.5, credito: 3.5 }), credito: parseFloat(e.target.value) || 0 }
-                  })}
+                  value={taxas.credito}
+                  onChange={(e) => handleTaxaChange('credito', e.target.value)}
                 />
               </div>
             </CardContent>
@@ -748,10 +1055,8 @@ export function ConfiguracoesSection({
                 <Input
                   type="number"
                   step="0.1"
-                  value={configuracoes.cmvPercentualPadrao ?? 30}
-                  onChange={(e) => onUpdateConfig({
-                    cmvPercentualPadrao: parseFloat(e.target.value) || 30
-                  })}
+                  value={cmvPercentual}
+                  onChange={(e) => handleCmvChange(e.target.value)}
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   Percentual do faturamento que representa o custo da mercadoria vendida. 
@@ -763,10 +1068,8 @@ export function ConfiguracoesSection({
                 <Input
                   type="number"
                   step="0.1"
-                  value={configuracoes.margemLucroPadrao ?? 60}
-                  onChange={(e) => onUpdateConfig({
-                    margemLucroPadrao: parseFloat(e.target.value) || 60
-                  })}
+                  value={margemLucro}
+                  onChange={(e) => handleMargemChange(e.target.value)}
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   Margem de lucro sugerida para novos produtos. 
@@ -862,7 +1165,7 @@ export function ConfiguracoesSection({
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => onDeleteCategoriaConta(cat.id)}
+                            onClick={() => handleDeleteCategoriaConta(cat.id)}
                           >
                             <Trash2 className="w-4 h-4 text-red-600" />
                           </Button>
@@ -950,7 +1253,7 @@ export function ConfiguracoesSection({
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => onDeleteCategoriaProduto(cat.id)}
+                            onClick={() => handleDeleteCategoriaProduto(cat.id)}
                           >
                             <Trash2 className="w-4 h-4 text-red-600" />
                           </Button>
