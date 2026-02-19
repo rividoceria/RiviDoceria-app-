@@ -315,6 +315,9 @@ export function useStorage() {
       return;
     }
 
+    // Usar fichaAtualizada para acessar os dados atualizados
+    const fichaAtual = fichaAtualizada;
+
     // 2. Atualizar os itens (simplificado: deleta tudo e reinsere)
     await supabase.from('itens_ficha').delete().eq('ficha_id', id);
     
@@ -344,11 +347,11 @@ export function useStorage() {
       );
     }
 
-    // 4. Atualizar o estado local
+    // 4. Atualizar o estado local com os dados mais recentes
     setData(prev => ({
       ...prev,
       fichasTecnicas: prev.fichasTecnicas.map(f => 
-        f.id === id ? { ...f, ...updates } : f
+        f.id === id ? { ...f, ...updates, ...fichaAtual } : f
       ),
     }));
   }, [user]);
