@@ -15,7 +15,7 @@ import type { CategoriaConta, CategoriaProduto, CustoFixo, CustoVariavel } from 
 import { toast } from 'sonner';
 
 interface ConfiguracoesProps {
-  data: any; // Simplificado para evitar erros
+  data: any;
 }
 
 export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
@@ -124,7 +124,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    const novosCustosFixos = (configuracoes.custosFixos || []).filter(c => c.id !== id);
+    const novosCustosFixos = (configuracoes.custosFixos || []).filter((c: CustoFixo) => c.id !== id);
     await updateConfiguracoes({ custosFixos: novosCustosFixos });
     toast.success('Custo fixo removido!');
   };
@@ -153,7 +153,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    const custosAtualizados = (configuracoes.custosFixos || []).map(custo => 
+    const custosAtualizados = (configuracoes.custosFixos || []).map((custo: CustoFixo) => 
       custo.id === id 
         ? { ...custo, nome: nomeFixo, valor: parseFloat(valorFixo) }
         : custo
@@ -217,7 +217,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    const novosCustosVariaveis = (configuracoes.custosVariaveis || []).filter(c => c.id !== id);
+    const novosCustosVariaveis = (configuracoes.custosVariaveis || []).filter((c: CustoVariavel) => c.id !== id);
     await updateConfiguracoes({ custosVariaveis: novosCustosVariaveis });
     toast.success('Custo variável removido!');
   };
@@ -246,7 +246,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    const custosAtualizados = (configuracoes.custosVariaveis || []).map(custo => 
+    const custosAtualizados = (configuracoes.custosVariaveis || []).map((custo: CustoVariavel) => 
       custo.id === id 
         ? { ...custo, nome: nomeVariavel, valor: parseFloat(valorVariavel) }
         : custo
@@ -581,8 +581,8 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     '#f87171', '#22d3ee', '#fb923c', '#e879f9', '#84cc16',
   ];
 
-  const totalFixos = (configuracoes.custosFixos || []).reduce((acc, c) => acc + (c?.valor || 0), 0);
-  const totalVariaveis = (configuracoes.custosVariaveis || []).reduce((acc, c) => acc + (c?.valor || 0), 0);
+  const totalFixos = (configuracoes.custosFixos || []).reduce((acc: number, c: CustoFixo) => acc + (c?.valor || 0), 0);
+  const totalVariaveis = (configuracoes.custosVariaveis || []).reduce((acc: number, c: CustoVariavel) => acc + (c?.valor || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -859,7 +859,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                {(configuracoes.custosFixos || []).map((custo) => (
+                {(configuracoes.custosFixos || []).map((custo: CustoFixo) => (
                   <div key={custo.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     {editandoFixo === custo.id ? (
                       <div className="flex-1 flex gap-2">
@@ -937,7 +937,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                {(configuracoes.custosVariaveis || []).map((custo) => (
+                {(configuracoes.custosVariaveis || []).map((custo: CustoVariavel) => (
                   <div key={custo.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     {editandoVariavel === custo.id ? (
                       <div className="flex-1 flex gap-2">
@@ -1048,7 +1048,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {(categoriasConta || []).map((cat) => (
+                {(categoriasConta || []).map((cat: CategoriaConta) => (
                   <div key={cat.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     {editandoCategoria === cat.id ? (
                       <div className="flex-1 flex flex-wrap gap-2">
@@ -1137,7 +1137,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {(categoriasProduto || []).map((cat) => (
+                {(categoriasProduto || []).map((cat: CategoriaProduto) => (
                   <div key={cat.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     {editandoCategoria === cat.id ? (
                       <div className="flex-1 flex flex-wrap gap-2">
