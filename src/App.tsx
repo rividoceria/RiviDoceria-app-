@@ -16,7 +16,7 @@ import { useStorage } from '@/hooks/useStorage';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
-import { ThemeProvider } from '@/contexts/ThemeContext'; // ← ADICIONADO
+import { ThemeProvider } from '@/contexts/ThemeContext';
 import Auth from '@/sections/Auth';
 import AuthCallback from '@/sections/AuthCallback';
 import ResetPassword from '@/sections/ResetPassword';
@@ -28,12 +28,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900"> {/* ← MODIFICADO */}
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
           <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-600 rounded-xl flex items-center justify-center mx-auto mb-4 animate-pulse">
             <span className="text-white font-bold text-xl">D</span>
           </div>
-          <p className="text-gray-600 dark:text-gray-400">Carregando DoceGestão...</p> {/* ← MODIFICADO */}
+          <p className="text-gray-600 dark:text-gray-400">Carregando DoceGestão...</p>
         </div>
       </div>
     );
@@ -52,12 +52,12 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900"> {/* ← MODIFICADO */}
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
           <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-600 rounded-xl flex items-center justify-center mx-auto mb-4 animate-pulse">
             <span className="text-white font-bold text-xl">D</span>
           </div>
-          <p className="text-gray-600 dark:text-gray-400">Carregando...</p> {/* ← MODIFICADO */}
+          <p className="text-gray-600 dark:text-gray-400">Carregando...</p>
         </div>
       </div>
     );
@@ -104,12 +104,12 @@ function MainApp() {
 
   if (!isLoaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900"> {/* ← MODIFICADO */}
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
           <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-600 rounded-xl flex items-center justify-center mx-auto mb-4 animate-pulse">
             <span className="text-white font-bold text-xl">D</span>
           </div>
-          <p className="text-gray-600 dark:text-gray-400">Carregando DoceGestão...</p> {/* ← MODIFICADO */}
+          <p className="text-gray-600 dark:text-gray-400">Carregando DoceGestão...</p>
         </div>
       </div>
     );
@@ -183,9 +183,7 @@ function MainApp() {
         return (
           <FichaTecnicaSection
             data={data}
-            onAddFicha={addFichaTecnica}
-            onUpdateFicha={updateFichaTecnica}
-            onDeleteFicha={deleteFichaTecnica}
+            // Props removidas - agora usa useStorage internamente
           />
         );
       case 'producao':
@@ -241,7 +239,7 @@ function MainApp() {
 // App principal com rotas
 function App() {
   return (
-    <ThemeProvider> {/* ← ADICIONADO - ENVOLVE TUDO */}
+    <ThemeProvider>
       <AuthProvider>
         <Router>
           <Routes>
@@ -272,7 +270,7 @@ function App() {
           </Routes>
         </Router>
       </AuthProvider>
-    </ThemeProvider> // ← ADICIONADO
+    </ThemeProvider>
   );
 }
 
