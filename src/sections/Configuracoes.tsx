@@ -58,12 +58,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
 
   const { configuracoes, categoriasConta, categoriasProduto } = data;
 
-  // ========== FUNÇÃO PARA RECARREGAR DADOS ==========
-  const reloadData = async () => {
-    if (!user) return;
-    window.location.reload();
-  };
-
   // ========== CUSTOS FIXOS ==========
   const handleAddCustoFixo = async () => {
     if (!user || !nomeFixo || !valorFixo) return;
@@ -86,14 +80,13 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
+    // Atualizar estado local
     const novosCustosFixos = [...(configuracoes.custosFixos || []), novo];
     await updateConfiguracoes({ custosFixos: novosCustosFixos });
     
     setNomeFixo('');
     setValorFixo('');
     toast.success('Custo fixo adicionado com sucesso!');
-    
-    setTimeout(() => reloadData(), 500);
   };
 
   const handleDeleteCustoFixo = async (id: string) => {
@@ -111,11 +104,10 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
+    // Atualizar estado local
     const novosCustosFixos = (configuracoes.custosFixos || []).filter((c: CustoFixo) => c.id !== id);
     await updateConfiguracoes({ custosFixos: novosCustosFixos });
     toast.success('Custo fixo removido!');
-    
-    setTimeout(() => reloadData(), 500);
   };
 
   const handleEditCustoFixo = (custo: CustoFixo) => {
@@ -142,6 +134,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
+    // Atualizar estado local
     const custosAtualizados = (configuracoes.custosFixos || []).map((custo: CustoFixo) => 
       custo.id === id 
         ? { ...custo, nome: nomeFixo, valor: parseFloat(valorFixo) }
@@ -153,8 +146,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     setNomeFixo('');
     setValorFixo('');
     toast.success('Custo fixo atualizado!');
-    
-    setTimeout(() => reloadData(), 500);
   };
 
   const cancelEditFixo = () => {
@@ -185,14 +176,13 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
+    // Atualizar estado local
     const novosCustosVariaveis = [...(configuracoes.custosVariaveis || []), novo];
     await updateConfiguracoes({ custosVariaveis: novosCustosVariaveis });
     
     setNomeVariavel('');
     setValorVariavel('');
     toast.success('Custo variável adicionado!');
-    
-    setTimeout(() => reloadData(), 500);
   };
 
   const handleDeleteCustoVariavel = async (id: string) => {
@@ -210,11 +200,10 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
+    // Atualizar estado local
     const novosCustosVariaveis = (configuracoes.custosVariaveis || []).filter((c: CustoVariavel) => c.id !== id);
     await updateConfiguracoes({ custosVariaveis: novosCustosVariaveis });
     toast.success('Custo variável removido!');
-    
-    setTimeout(() => reloadData(), 500);
   };
 
   const handleEditCustoVariavel = (custo: CustoVariavel) => {
@@ -241,6 +230,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
+    // Atualizar estado local
     const custosAtualizados = (configuracoes.custosVariaveis || []).map((custo: CustoVariavel) => 
       custo.id === id 
         ? { ...custo, nome: nomeVariavel, valor: parseFloat(valorVariavel) }
@@ -252,8 +242,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     setNomeVariavel('');
     setValorVariavel('');
     toast.success('Custo variável atualizado!');
-    
-    setTimeout(() => reloadData(), 500);
   };
 
   const cancelEditVariavel = () => {
@@ -274,7 +262,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       cor,
     };
 
-    const { error } = await supabase
+    const { data: nova, error } = await supabase
       .from('categorias_contas')
       .insert([novaCategoria])
       .select()
@@ -286,11 +274,12 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
+    // Atualizar estado local através do data
+    data.categoriasConta = [...(categoriasConta || []), nova];
+    
     resetCategoriaForm();
     setIsDialogOpen(false);
     toast.success('Categoria adicionada com sucesso!');
-    
-    setTimeout(() => reloadData(), 500);
   };
 
   const handleEditCategoriaConta = (categoria: CategoriaConta) => {
@@ -321,11 +310,21 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
+    // Atualizar estado local
+    const index = data.categoriasConta.findIndex((c: CategoriaConta) => c.id === id);
+    if (index !== -1) {
+      data.categoriasConta[index] = {
+        ...data.categoriasConta[index],
+        nome,
+        tipo,
+        limiteGasto: limiteGasto ? parseFloat(limiteGasto) : undefined,
+        cor,
+      };
+    }
+
     setEditandoCategoria(null);
     resetCategoriaForm();
     toast.success('Categoria atualizada!');
-    
-    setTimeout(() => reloadData(), 500);
   };
 
   const handleDeleteCategoriaConta = async (id: string) => {
@@ -343,9 +342,9 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
+    // Atualizar estado local
+    data.categoriasConta = (categoriasConta || []).filter((c: CategoriaConta) => c.id !== id);
     toast.success('Categoria deletada!');
-    
-    setTimeout(() => reloadData(), 500);
   };
 
   const cancelEditCategoria = () => {
@@ -364,7 +363,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       cor,
     };
 
-    const { error } = await supabase
+    const { data: nova, error } = await supabase
       .from('categorias_produtos')
       .insert([novaCategoria])
       .select()
@@ -376,11 +375,12 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
+    // Atualizar estado local
+    data.categoriasProduto = [...(categoriasProduto || []), nova];
+    
     resetCategoriaForm();
     setIsDialogOpen(false);
     toast.success('Categoria adicionada com sucesso!');
-    
-    setTimeout(() => reloadData(), 500);
   };
 
   const handleEditCategoriaProduto = (categoria: CategoriaProduto) => {
@@ -409,11 +409,20 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
+    // Atualizar estado local
+    const index = data.categoriasProduto.findIndex((c: CategoriaProduto) => c.id === id);
+    if (index !== -1) {
+      data.categoriasProduto[index] = {
+        ...data.categoriasProduto[index],
+        nome,
+        margemPadrao: parseFloat(margemPadrao),
+        cor,
+      };
+    }
+
     setEditandoCategoria(null);
     resetCategoriaForm();
     toast.success('Categoria atualizada!');
-    
-    setTimeout(() => reloadData(), 500);
   };
 
   const handleDeleteCategoriaProduto = async (id: string) => {
@@ -431,9 +440,9 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
+    // Atualizar estado local
+    data.categoriasProduto = (categoriasProduto || []).filter((c: CategoriaProduto) => c.id !== id);
     toast.success('Categoria deletada!');
-    
-    setTimeout(() => reloadData(), 500);
   };
 
   // ========== TAXAS ==========
