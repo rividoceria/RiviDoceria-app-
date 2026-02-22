@@ -86,6 +86,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     const novosCustosFixos = [...(configuracoes.custosFixos || []), novo];
     await updateConfiguracoes({ custosFixos: novosCustosFixos });
     
+    // ATUALIZAÇÃO DIRETA NO DATA
     if (data?.configuracoes) {
       data.configuracoes.custosFixos = novosCustosFixos;
     }
@@ -113,6 +114,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     const novosCustosFixos = (configuracoes.custosFixos || []).filter((c: CustoFixo) => c.id !== id);
     await updateConfiguracoes({ custosFixos: novosCustosFixos });
     
+    // ATUALIZAÇÃO DIRETA NO DATA
     if (data?.configuracoes) {
       data.configuracoes.custosFixos = novosCustosFixos;
     }
@@ -151,6 +153,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     );
     await updateConfiguracoes({ custosFixos: custosAtualizados });
     
+    // ATUALIZAÇÃO DIRETA NO DATA
     if (data?.configuracoes) {
       data.configuracoes.custosFixos = custosAtualizados;
     }
@@ -192,6 +195,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     const novosCustosVariaveis = [...(configuracoes.custosVariaveis || []), novo];
     await updateConfiguracoes({ custosVariaveis: novosCustosVariaveis });
     
+    // ATUALIZAÇÃO DIRETA NO DATA
     if (data?.configuracoes) {
       data.configuracoes.custosVariaveis = novosCustosVariaveis;
     }
@@ -219,6 +223,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     const novosCustosVariaveis = (configuracoes.custosVariaveis || []).filter((c: CustoVariavel) => c.id !== id);
     await updateConfiguracoes({ custosVariaveis: novosCustosVariaveis });
     
+    // ATUALIZAÇÃO DIRETA NO DATA
     if (data?.configuracoes) {
       data.configuracoes.custosVariaveis = novosCustosVariaveis;
     }
@@ -257,6 +262,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     );
     await updateConfiguracoes({ custosVariaveis: custosAtualizados });
     
+    // ATUALIZAÇÃO DIRETA NO DATA
     if (data?.configuracoes) {
       data.configuracoes.custosVariaveis = custosAtualizados;
     }
@@ -273,26 +279,18 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     setValorVariavel('');
   };
 
-  // ========== CATEGORIAS DE CONTAS (CORRIGIDO - LIMITE DE GASTO) ==========
+  // ========== CATEGORIAS DE CONTAS (CORRIGIDO) ==========
   const handleAddCategoriaConta = async () => {
     if (!user || !nome) return;
 
-    // CORREÇÃO: Converter limiteGasto para número ou null
+    // CORREÇÃO: Converter limiteGasto corretamente
     const limiteGastoValue = limiteGasto && limiteGasto.trim() !== '' ? parseFloat(limiteGasto) : null;
-
-    // Log para debug
-    console.log('Adicionando categoria:', {
-      nome,
-      tipo,
-      limiteGasto: limiteGastoValue,
-      cor
-    });
 
     const novaCategoria = {
       user_id: user.id,
       nome,
       tipo,
-      limite_gasto: limiteGastoValue, // Nome correto no banco: limite_gasto
+      limite_gasto: limiteGastoValue,
       cor,
     };
 
@@ -308,12 +306,9 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    // Log para debug
-    console.log('Categoria adicionada:', nova);
-
-    // Atualizar o data diretamente
+    // ATUALIZAÇÃO DIRETA NO DATA
     if (data?.categoriasConta) {
-      data.categoriasConta.push(nova);
+      data.categoriasConta = [...data.categoriasConta, nova];
     } else if (data) {
       data.categoriasConta = [nova];
     }
@@ -357,18 +352,13 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    // Atualizar no data
+    // ATUALIZAÇÃO DIRETA NO DATA
     if (data?.categoriasConta) {
-      const index = data.categoriasConta.findIndex((c: any) => c.id === id);
-      if (index !== -1) {
-        data.categoriasConta[index] = {
-          ...data.categoriasConta[index],
-          nome,
-          tipo,
-          limiteGasto: limiteGastoValue,
-          cor,
-        };
-      }
+      data.categoriasConta = data.categoriasConta.map((c: any) => 
+        c.id === id 
+          ? { ...c, nome, tipo, limiteGasto: limiteGastoValue, cor }
+          : c
+      );
     }
 
     setEditandoCategoria(null);
@@ -391,9 +381,11 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
+    // ATUALIZAÇÃO DIRETA NO DATA
     if (data?.categoriasConta) {
       data.categoriasConta = data.categoriasConta.filter((c: any) => c.id !== id);
     }
+    
     toast.success('Categoria deletada!');
   };
 
@@ -402,28 +394,21 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     resetCategoriaForm();
   };
 
-  // ========== CATEGORIAS DE PRODUTOS (CORRIGIDO - MARGEM PADRÃO) ==========
+  // ========== CATEGORIAS DE PRODUTOS (CORRIGIDO) ==========
   const handleAddCategoriaProduto = async () => {
     if (!user || !nome || !margemPadrao) return;
 
     // CORREÇÃO: Garantir que margemPadrao seja um número válido
     const margemValue = parseFloat(margemPadrao);
     if (isNaN(margemValue) || margemValue <= 0) {
-      toast.error('Margem padrão deve ser um número válido');
+      toast.error('Margem padrão deve ser um número válido maior que zero');
       return;
     }
-
-    // Log para debug
-    console.log('Adicionando categoria de produto:', {
-      nome,
-      margem: margemValue,
-      cor
-    });
 
     const novaCategoria = {
       user_id: user.id,
       nome,
-      margem_padrao: margemValue, // Nome correto no banco: margem_padrao
+      margem_padrao: margemValue,
       cor,
     };
 
@@ -439,12 +424,9 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    // Log para debug
-    console.log('Categoria de produto adicionada:', nova);
-
-    // Atualizar o data diretamente
+    // ATUALIZAÇÃO DIRETA NO DATA
     if (data?.categoriasProduto) {
-      data.categoriasProduto.push(nova);
+      data.categoriasProduto = [...data.categoriasProduto, nova];
     } else if (data) {
       data.categoriasProduto = [nova];
     }
@@ -469,7 +451,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
 
     const margemValue = parseFloat(margemPadrao);
     if (isNaN(margemValue) || margemValue <= 0) {
-      toast.error('Margem padrão deve ser um número válido');
+      toast.error('Margem padrão deve ser um número válido maior que zero');
       return;
     }
 
@@ -489,17 +471,13 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    // Atualizar no data
+    // ATUALIZAÇÃO DIRETA NO DATA
     if (data?.categoriasProduto) {
-      const index = data.categoriasProduto.findIndex((c: any) => c.id === id);
-      if (index !== -1) {
-        data.categoriasProduto[index] = {
-          ...data.categoriasProduto[index],
-          nome,
-          margemPadrao: margemValue,
-          cor,
-        };
-      }
+      data.categoriasProduto = data.categoriasProduto.map((c: any) => 
+        c.id === id 
+          ? { ...c, nome, margemPadrao: margemValue, cor }
+          : c
+      );
     }
 
     setEditandoCategoria(null);
@@ -522,9 +500,11 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
+    // ATUALIZAÇÃO DIRETA NO DATA
     if (data?.categoriasProduto) {
       data.categoriasProduto = data.categoriasProduto.filter((c: any) => c.id !== id);
     }
+    
     toast.success('Categoria deletada!');
   };
 
@@ -754,7 +734,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
                 <Input
                   type="number"
                   step="0.1"
-                  min="0"
+                  min="0.1"
                   max="100"
                   value={margemPadrao}
                   onChange={(e) => setMargemPadrao(e.target.value)}
