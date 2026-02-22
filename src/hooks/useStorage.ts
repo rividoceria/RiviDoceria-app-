@@ -72,7 +72,6 @@ export function useStorage() {
       }
 
       try {
-        // Carregar todas as tabelas em paralelo
         const [
           categoriasProduto,
           categoriasConta,
@@ -99,7 +98,6 @@ export function useStorage() {
           supabase.from('configuracoes').select('*').eq('user_id', user.id).maybeSingle()
         ]);
 
-        // Carregar itens das fichas técnicas
         let itensFicha: any[] = [];
         if (fichasTecnicas.data && fichasTecnicas.data.length > 0) {
           const fichaIds = fichasTecnicas.data.map(f => f.id);
@@ -110,7 +108,6 @@ export function useStorage() {
           itensFicha = itensResult.data || [];
         }
 
-        // Carregar receitas base
         let receitasBase: any[] = [];
         if (fichasTecnicas.data && fichasTecnicas.data.length > 0) {
           const fichaIds = fichasTecnicas.data.map(f => f.id);
@@ -121,7 +118,6 @@ export function useStorage() {
           receitasBase = receitasResult.data || [];
         }
 
-        // Montar os dados no formato esperado pelo app
         const loadedData: SistemaData = {
           ingredientes: (ingredientes.data || []).map((item: any) => ({
             id: item.id,
@@ -370,8 +366,6 @@ export function useStorage() {
       return;
     }
 
-    const fichaAtual = fichaAtualizada;
-
     await supabase.from('itens_ficha').delete().eq('ficha_id', id);
     
     const itens = [
@@ -402,7 +396,7 @@ export function useStorage() {
     setData(prev => ({
       ...prev,
       fichasTecnicas: prev.fichasTecnicas.map(f => 
-        f.id === id ? { ...f, ...updates, ...fichaAtual } : f
+        f.id === id ? { ...f, ...updates, ...fichaAtualizada } : f
       ),
     }));
   }, [user]);
@@ -715,16 +709,21 @@ export function useStorage() {
     }));
   }, [user]);
 
-  // ========== CATEGORIAS DE CONTAS (CORRIGIDO) ==========
+  // ========== CATEGORIAS DE CONTAS (VERSÃO ULTRA RÁPIDA) ==========
   const addCategoriaConta = useCallback(async (categoria: Omit<CategoriaConta, 'id'>) => {
-    if (!user) return;
+    if (!user) {
+      toast.error('Usuário não logado');
+      return;
+    }
+
+    console.log('📝 Adicionando categoria de conta:', categoria);
 
     const { data: result, error } = await supabase
       .from('categorias_contas')
       .insert([{
         nome: categoria.nome,
         tipo: categoria.tipo,
-        limite_gasto: categoria.limiteGasto, // ← CORREÇÃO: limite_gasto
+        limite_gasto: categoria.limiteGasto,
         cor: categoria.cor,
         user_id: user.id,
       }])
@@ -732,25 +731,35 @@ export function useStorage() {
       .single();
 
     if (error) {
-      console.error('Erro ao adicionar categoria de conta:', error);
-      toast.error('Erro ao adicionar categoria de conta');
+      console.error('❌ Erro no Supabase:', error);
+      toast.error('Erro ao adicionar categoria: ' + error.message);
       return;
     }
 
-    // Converter de volta para o formato do app
+    console.log('✅ Categoria adicionada no Supabase:', result);
+
+    // Converter para o formato do app
     const novaCategoria: CategoriaConta = {
       id: result.id,
       nome: result.nome,
       tipo: result.tipo,
-      limiteGasto: result.limite_gasto, // ← CONVERSÃO
+      limiteGasto: result.limite_gasto,
       cor: result.cor,
     };
 
-    setData(prev => ({
-      ...prev,
-      categoriasConta: [...prev.categoriasConta, novaCategoria],
-    }));
+    console.log('🔄 Atualizando estado local com:', novaCategoria);
 
+    // ATUALIZAÇÃO IMEDIATA DO ESTADO
+    setData(prev => {
+      const novoEstado = {
+        ...prev,
+        categoriasConta: [...prev.categoriasConta, novaCategoria],
+      };
+      console.log('📊 Novo estado:', novoEstado.categoriasConta);
+      return novoEstado;
+    });
+
+    toast.success('Categoria adicionada com sucesso!');
     return novaCategoria;
   }, [user]);
 
@@ -760,7 +769,7 @@ export function useStorage() {
     const dbUpdates: any = {};
     if (updates.nome !== undefined) dbUpdates.nome = updates.nome;
     if (updates.tipo !== undefined) dbUpdates.tipo = updates.tipo;
-    if (updates.limiteGasto !== undefined) dbUpdates.limite_gasto = updates.limiteGasto; // ← CORREÇÃO
+    if (updates.limiteGasto !== undefined) dbUpdates.limite_gasto = updates.limiteGasto;
     if (updates.cor !== undefined) dbUpdates.cor = updates.cor;
 
     const { data: result, error } = await supabase
@@ -773,16 +782,15 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao atualizar categoria de conta:', error);
-      toast.error('Erro ao atualizar categoria de conta');
+      toast.error('Erro ao atualizar categoria');
       return;
     }
 
-    // Converter de volta
     const categoriaAtualizada: CategoriaConta = {
       id: result.id,
       nome: result.nome,
       tipo: result.tipo,
-      limiteGasto: result.limite_gasto, // ← CONVERSÃO
+      limiteGasto: result.limite_gasto,
       cor: result.cor,
     };
 
@@ -790,6 +798,8 @@ export function useStorage() {
       ...prev,
       categoriasConta: prev.categoriasConta.map(c => c.id === id ? categoriaAtualizada : c),
     }));
+
+    toast.success('Categoria atualizada!');
   }, [user]);
 
   const deleteCategoriaConta = useCallback(async (id: string) => {
@@ -803,7 +813,7 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao deletar categoria de conta:', error);
-      toast.error('Erro ao deletar categoria de conta');
+      toast.error('Erro ao deletar categoria');
       return;
     }
 
@@ -811,17 +821,24 @@ export function useStorage() {
       ...prev,
       categoriasConta: prev.categoriasConta.filter(c => c.id !== id),
     }));
+
+    toast.success('Categoria deletada!');
   }, [user]);
 
-  // ========== CATEGORIAS DE PRODUTOS (CORRIGIDO) ==========
+  // ========== CATEGORIAS DE PRODUTOS (VERSÃO ULTRA RÁPIDA) ==========
   const addCategoriaProduto = useCallback(async (categoria: Omit<CategoriaProduto, 'id'>) => {
-    if (!user) return;
+    if (!user) {
+      toast.error('Usuário não logado');
+      return;
+    }
+
+    console.log('📝 Adicionando categoria de produto:', categoria);
 
     const { data: result, error } = await supabase
       .from('categorias_produtos')
       .insert([{
         nome: categoria.nome,
-        margem_padrao: categoria.margemPadrao, // ← CORREÇÃO: margem_padrao
+        margem_padrao: categoria.margemPadrao,
         cor: categoria.cor,
         user_id: user.id,
       }])
@@ -829,24 +846,34 @@ export function useStorage() {
       .single();
 
     if (error) {
-      console.error('Erro ao adicionar categoria de produto:', error);
-      toast.error('Erro ao adicionar categoria de produto');
+      console.error('❌ Erro no Supabase:', error);
+      toast.error('Erro ao adicionar categoria: ' + error.message);
       return;
     }
 
-    // Converter de volta para o formato do app
+    console.log('✅ Categoria adicionada no Supabase:', result);
+
+    // Converter para o formato do app
     const novaCategoria: CategoriaProduto = {
       id: result.id,
       nome: result.nome,
-      margemPadrao: result.margem_padrao, // ← CONVERSÃO
+      margemPadrao: result.margem_padrao,
       cor: result.cor,
     };
 
-    setData(prev => ({
-      ...prev,
-      categoriasProduto: [...prev.categoriasProduto, novaCategoria],
-    }));
+    console.log('🔄 Atualizando estado local com:', novaCategoria);
 
+    // ATUALIZAÇÃO IMEDIATA DO ESTADO
+    setData(prev => {
+      const novoEstado = {
+        ...prev,
+        categoriasProduto: [...prev.categoriasProduto, novaCategoria],
+      };
+      console.log('📊 Novo estado:', novoEstado.categoriasProduto);
+      return novoEstado;
+    });
+
+    toast.success('Categoria adicionada com sucesso!');
     return novaCategoria;
   }, [user]);
 
@@ -855,7 +882,7 @@ export function useStorage() {
 
     const dbUpdates: any = {};
     if (updates.nome !== undefined) dbUpdates.nome = updates.nome;
-    if (updates.margemPadrao !== undefined) dbUpdates.margem_padrao = updates.margemPadrao; // ← CORREÇÃO
+    if (updates.margemPadrao !== undefined) dbUpdates.margem_padrao = updates.margemPadrao;
     if (updates.cor !== undefined) dbUpdates.cor = updates.cor;
 
     const { data: result, error } = await supabase
@@ -868,15 +895,14 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao atualizar categoria de produto:', error);
-      toast.error('Erro ao atualizar categoria de produto');
+      toast.error('Erro ao atualizar categoria');
       return;
     }
 
-    // Converter de volta
     const categoriaAtualizada: CategoriaProduto = {
       id: result.id,
       nome: result.nome,
-      margemPadrao: result.margem_padrao, // ← CONVERSÃO
+      margemPadrao: result.margem_padrao,
       cor: result.cor,
     };
 
@@ -884,6 +910,8 @@ export function useStorage() {
       ...prev,
       categoriasProduto: prev.categoriasProduto.map(c => c.id === id ? categoriaAtualizada : c),
     }));
+
+    toast.success('Categoria atualizada!');
   }, [user]);
 
   const deleteCategoriaProduto = useCallback(async (id: string) => {
@@ -897,7 +925,7 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao deletar categoria de produto:', error);
-      toast.error('Erro ao deletar categoria de produto');
+      toast.error('Erro ao deletar categoria');
       return;
     }
 
@@ -905,6 +933,8 @@ export function useStorage() {
       ...prev,
       categoriasProduto: prev.categoriasProduto.filter(c => c.id !== id),
     }));
+
+    toast.success('Categoria deletada!');
   }, [user]);
 
   // Função de updateData mantida para compatibilidade
