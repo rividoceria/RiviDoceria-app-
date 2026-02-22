@@ -28,6 +28,8 @@ export function Precificacao({ data, onUpdateFicha }: PrecificacaoProps) {
   }, [data?.categoriasProduto]);
 
   const produtosPorCategoria = useMemo(() => {
+    if (!categoriasProduto.length || !produtos.length) return [];
+    
     const grouped: Record<string, { categoria: typeof categoriasProduto[0]; produtos: typeof produtos }> = {};
     
     produtos.forEach(produto => {
