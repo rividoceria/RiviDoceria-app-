@@ -61,7 +61,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
   const categoriasConta = data?.categoriasConta || [];
   const categoriasProduto = data?.categoriasProduto || [];
 
-  // ========== CUSTOS FIXOS (CORRIGIDO - ATUALIZA IMEDIATAMENTE) ==========
+  // ========== CUSTOS FIXOS ==========
   const handleAddCustoFixo = async () => {
     if (!user || !nomeFixo || !valorFixo) return;
 
@@ -83,11 +83,9 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    // ATUALIZAÇÃO DUPLA: via updateConfiguracoes e diretamente no data
     const novosCustosFixos = [...(configuracoes.custosFixos || []), novo];
     await updateConfiguracoes({ custosFixos: novosCustosFixos });
     
-    // Atualizar diretamente no data para forçar re-render
     if (data?.configuracoes) {
       data.configuracoes.custosFixos = novosCustosFixos;
     }
@@ -115,7 +113,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     const novosCustosFixos = (configuracoes.custosFixos || []).filter((c: CustoFixo) => c.id !== id);
     await updateConfiguracoes({ custosFixos: novosCustosFixos });
     
-    // Atualizar diretamente no data
     if (data?.configuracoes) {
       data.configuracoes.custosFixos = novosCustosFixos;
     }
@@ -154,7 +151,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     );
     await updateConfiguracoes({ custosFixos: custosAtualizados });
     
-    // Atualizar diretamente no data
     if (data?.configuracoes) {
       data.configuracoes.custosFixos = custosAtualizados;
     }
@@ -171,7 +167,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     setValorFixo('');
   };
 
-  // ========== CUSTOS VARIÁVEIS (CORRIGIDO - ATUALIZA IMEDIATAMENTE) ==========
+  // ========== CUSTOS VARIÁVEIS ==========
   const handleAddCustoVariavel = async () => {
     if (!user || !nomeVariavel || !valorVariavel) return;
 
@@ -196,7 +192,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     const novosCustosVariaveis = [...(configuracoes.custosVariaveis || []), novo];
     await updateConfiguracoes({ custosVariaveis: novosCustosVariaveis });
     
-    // Atualizar diretamente no data
     if (data?.configuracoes) {
       data.configuracoes.custosVariaveis = novosCustosVariaveis;
     }
@@ -224,7 +219,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     const novosCustosVariaveis = (configuracoes.custosVariaveis || []).filter((c: CustoVariavel) => c.id !== id);
     await updateConfiguracoes({ custosVariaveis: novosCustosVariaveis });
     
-    // Atualizar diretamente no data
     if (data?.configuracoes) {
       data.configuracoes.custosVariaveis = novosCustosVariaveis;
     }
@@ -263,7 +257,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     );
     await updateConfiguracoes({ custosVariaveis: custosAtualizados });
     
-    // Atualizar diretamente no data
     if (data?.configuracoes) {
       data.configuracoes.custosVariaveis = custosAtualizados;
     }
@@ -284,8 +277,16 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
   const handleAddCategoriaConta = async () => {
     if (!user || !nome) return;
 
-    // CORREÇÃO: Garantir que limiteGasto seja enviado como número ou null
-    const limiteGastoValue = limiteGasto ? parseFloat(limiteGasto) : null;
+    // CORREÇÃO: Converter limiteGasto para número ou null
+    const limiteGastoValue = limiteGasto && limiteGasto.trim() !== '' ? parseFloat(limiteGasto) : null;
+
+    // Log para debug
+    console.log('Adicionando categoria:', {
+      nome,
+      tipo,
+      limiteGasto: limiteGastoValue,
+      cor
+    });
 
     const novaCategoria = {
       user_id: user.id,
@@ -306,6 +307,9 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       toast.error('Erro ao adicionar categoria');
       return;
     }
+
+    // Log para debug
+    console.log('Categoria adicionada:', nova);
 
     // Atualizar o data diretamente
     if (data?.categoriasConta) {
@@ -334,7 +338,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
   const handleSaveEditCategoriaConta = async (id: string) => {
     if (!user || !nome) return;
 
-    const limiteGastoValue = limiteGasto ? parseFloat(limiteGasto) : null;
+    const limiteGastoValue = limiteGasto && limiteGasto.trim() !== '' ? parseFloat(limiteGasto) : null;
 
     const { error } = await supabase
       .from('categorias_contas')
@@ -361,7 +365,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
           ...data.categoriasConta[index],
           nome,
           tipo,
-          limiteGasto: limiteGastoValue ? limiteGastoValue : undefined,
+          limiteGasto: limiteGastoValue,
           cor,
         };
       }
@@ -398,14 +402,28 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     resetCategoriaForm();
   };
 
-  // ========== CATEGORIAS DE PRODUTOS (CORRIGIDO - SEM TELA BRANCA) ==========
+  // ========== CATEGORIAS DE PRODUTOS (CORRIGIDO - MARGEM PADRÃO) ==========
   const handleAddCategoriaProduto = async () => {
     if (!user || !nome || !margemPadrao) return;
+
+    // CORREÇÃO: Garantir que margemPadrao seja um número válido
+    const margemValue = parseFloat(margemPadrao);
+    if (isNaN(margemValue) || margemValue <= 0) {
+      toast.error('Margem padrão deve ser um número válido');
+      return;
+    }
+
+    // Log para debug
+    console.log('Adicionando categoria de produto:', {
+      nome,
+      margem: margemValue,
+      cor
+    });
 
     const novaCategoria = {
       user_id: user.id,
       nome,
-      margem_padrao: parseFloat(margemPadrao),
+      margem_padrao: margemValue, // Nome correto no banco: margem_padrao
       cor,
     };
 
@@ -420,6 +438,9 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       toast.error('Erro ao adicionar categoria');
       return;
     }
+
+    // Log para debug
+    console.log('Categoria de produto adicionada:', nova);
 
     // Atualizar o data diretamente
     if (data?.categoriasProduto) {
@@ -446,11 +467,17 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
   const handleSaveEditCategoriaProduto = async (id: string) => {
     if (!user || !nome || !margemPadrao) return;
 
+    const margemValue = parseFloat(margemPadrao);
+    if (isNaN(margemValue) || margemValue <= 0) {
+      toast.error('Margem padrão deve ser um número válido');
+      return;
+    }
+
     const { error } = await supabase
       .from('categorias_produtos')
       .update({
         nome,
-        margem_padrao: parseFloat(margemPadrao),
+        margem_padrao: margemValue,
         cor,
       })
       .eq('id', id)
@@ -469,7 +496,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
         data.categoriasProduto[index] = {
           ...data.categoriasProduto[index],
           nome,
-          margemPadrao: parseFloat(margemPadrao),
+          margemPadrao: margemValue,
           cor,
         };
       }
@@ -712,6 +739,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
                   <Input
                     type="number"
                     step="0.01"
+                    min="0"
                     value={limiteGasto}
                     onChange={(e) => setLimiteGasto(e.target.value)}
                     placeholder="0,00"
@@ -726,9 +754,12 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
                 <Input
                   type="number"
                   step="0.1"
+                  min="0"
+                  max="100"
                   value={margemPadrao}
                   onChange={(e) => setMargemPadrao(e.target.value)}
                   placeholder="60"
+                  required
                 />
               </div>
             )}
