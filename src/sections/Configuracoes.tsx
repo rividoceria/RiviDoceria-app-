@@ -306,7 +306,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    // ATUALIZAÇÃO DIRETA NO DATA
+    // CORREÇÃO: Criar NOVO array para forçar re-render
     if (data?.categoriasConta) {
       data.categoriasConta = [...data.categoriasConta, nova];
     } else if (data) {
@@ -352,7 +352,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    // ATUALIZAÇÃO DIRETA NO DATA
+    // CORREÇÃO: Criar NOVO array com o item atualizado
     if (data?.categoriasConta) {
       data.categoriasConta = data.categoriasConta.map((c: any) => 
         c.id === id 
@@ -381,7 +381,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    // ATUALIZAÇÃO DIRETA NO DATA
+    // CORREÇÃO: Criar NOVO array sem o item deletado
     if (data?.categoriasConta) {
       data.categoriasConta = data.categoriasConta.filter((c: any) => c.id !== id);
     }
@@ -424,7 +424,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    // ATUALIZAÇÃO DIRETA NO DATA
+    // CORREÇÃO: Criar NOVO array para forçar re-render
     if (data?.categoriasProduto) {
       data.categoriasProduto = [...data.categoriasProduto, nova];
     } else if (data) {
@@ -471,7 +471,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    // ATUALIZAÇÃO DIRETA NO DATA
+    // CORREÇÃO: Criar NOVO array com o item atualizado
     if (data?.categoriasProduto) {
       data.categoriasProduto = data.categoriasProduto.map((c: any) => 
         c.id === id 
@@ -500,7 +500,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    // ATUALIZAÇÃO DIRETA NO DATA
+    // CORREÇÃO: Criar NOVO array sem o item deletado
     if (data?.categoriasProduto) {
       data.categoriasProduto = data.categoriasProduto.filter((c: any) => c.id !== id);
     }
