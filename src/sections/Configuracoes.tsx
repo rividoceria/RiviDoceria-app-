@@ -261,7 +261,8 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
   const handleAddCategoriaConta = async () => {
     if (!user || !nome) return;
 
-    const limiteGastoValue = limiteGasto && limiteGasto.trim() !== '' ? parseFloat(limiteGasto) : null;
+    // CORREÇÃO: Converter para undefined em vez de null
+    const limiteGastoValue = limiteGasto && limiteGasto.trim() !== '' ? parseFloat(limiteGasto) : undefined;
 
     // Usar a função do useStorage que já atualiza o estado global
     await addCategoriaConta({
@@ -290,7 +291,8 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
   const handleSaveEditCategoriaConta = async (id: string) => {
     if (!user || !nome) return;
 
-    const limiteGastoValue = limiteGasto && limiteGasto.trim() !== '' ? parseFloat(limiteGasto) : null;
+    // CORREÇÃO: Converter para undefined em vez de null
+    const limiteGastoValue = limiteGasto && limiteGasto.trim() !== '' ? parseFloat(limiteGasto) : undefined;
 
     // Usar a função do useStorage
     await updateCategoriaConta(id, {
