@@ -13,6 +13,7 @@ import type {
   ContaPagar,
   Meta
 } from '@/types';
+import { toast } from 'sonner';
 
 const defaultConfig: Configuracoes = {
   taxas: {
@@ -127,13 +128,13 @@ export function useStorage() {
             nome: item.nome,
             quantidadeEmbalagem: item.quantidade_embalagem,
             unidade: item.unidade,
-            precoEmbalagem: 0, // Campo que não existe no banco
+            precoEmbalagem: 0,
             custoUnidade: item.custo_unidade,
             estoqueAtual: item.quantidade_estoque,
             estoqueMinimo: item.estoque_minimo,
             tipo: item.tipo,
             createdAt: item.created_at,
-            updatedAt: item.created_at, // Usando created_at como fallback
+            updatedAt: item.created_at,
           })),
           fichasTecnicas: (fichasTecnicas.data || []).map((ficha: any) => ({
             ...ficha,
@@ -172,7 +173,6 @@ export function useStorage() {
   const addIngrediente = useCallback(async (ingrediente: Omit<Ingrediente, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!user) return;
 
-    // Converter do formato do app para o formato do banco
     const newIngrediente = {
       user_id: user.id,
       nome: ingrediente.nome,
@@ -183,7 +183,6 @@ export function useStorage() {
       estoque_minimo: ingrediente.estoqueMinimo,
       quantidade_estoque: ingrediente.estoqueAtual,
       created_at: new Date().toISOString(),
-      // NÃO TEM updated_at no banco
     };
 
     const { data: result, error } = await supabase
@@ -194,16 +193,16 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao adicionar ingrediente:', error);
+      toast.error('Erro ao adicionar ingrediente');
       return;
     }
 
-    // Converter de volta para o formato do app
     const novoIngrediente: Ingrediente = {
       id: result.id,
       nome: result.nome,
       quantidadeEmbalagem: result.quantidade_embalagem,
       unidade: result.unidade,
-      precoEmbalagem: 0, // Campo que não existe no banco
+      precoEmbalagem: 0,
       custoUnidade: result.custo_unidade,
       estoqueAtual: result.quantidade_estoque,
       estoqueMinimo: result.estoque_minimo,
@@ -223,7 +222,6 @@ export function useStorage() {
   const updateIngrediente = useCallback(async (id: string, updates: Partial<Ingrediente>) => {
     if (!user) return;
 
-    // Converter para formato do banco
     const dbUpdates: any = {};
     if (updates.nome !== undefined) dbUpdates.nome = updates.nome;
     if (updates.tipo !== undefined) dbUpdates.tipo = updates.tipo;
@@ -243,10 +241,10 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao atualizar ingrediente:', error);
+      toast.error('Erro ao atualizar ingrediente');
       return;
     }
 
-    // Converter de volta
     const ingredienteAtualizado: Ingrediente = {
       id: result.id,
       nome: result.nome,
@@ -278,6 +276,7 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao deletar ingrediente:', error);
+      toast.error('Erro ao deletar ingrediente');
       return;
     }
 
@@ -291,7 +290,6 @@ export function useStorage() {
   const addFichaTecnica = useCallback(async (ficha: Omit<FichaTecnica, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!user) return;
 
-    // 1. Inserir a ficha técnica
     const { data: novaFicha, error: fichaError } = await supabase
       .from('fichas_tecnicas')
       .insert([{
@@ -305,10 +303,10 @@ export function useStorage() {
 
     if (fichaError) {
       console.error('Erro ao adicionar ficha técnica:', fichaError);
+      toast.error('Erro ao adicionar ficha técnica');
       return;
     }
 
-    // 2. Inserir os itens (ingredientes e embalagens)
     const itens = [
       ...(ficha.itens || []).map(item => ({ ...item, tipo: 'ingrediente' })),
       ...(ficha.itensEmbalagem || []).map(item => ({ ...item, tipo: 'embalagem' }))
@@ -327,7 +325,6 @@ export function useStorage() {
       }
     }
 
-    // 3. Inserir receitas base
     if (ficha.receitasBaseIds && ficha.receitasBaseIds.length > 0) {
       const { error: receitasError } = await supabase
         .from('receitas_base_ficha')
@@ -341,7 +338,6 @@ export function useStorage() {
       }
     }
 
-    // 4. Atualizar o estado local
     const fichaCompleta: FichaTecnica = {
       ...novaFicha,
       itens: ficha.itens || [],
@@ -360,7 +356,6 @@ export function useStorage() {
   const updateFichaTecnica = useCallback(async (id: string, updates: Partial<FichaTecnica>) => {
     if (!user) return;
 
-    // 1. Atualizar a ficha técnica
     const { data: fichaAtualizada, error: fichaError } = await supabase
       .from('fichas_tecnicas')
       .update({ ...updates, updated_at: new Date().toISOString() })
@@ -371,13 +366,12 @@ export function useStorage() {
 
     if (fichaError) {
       console.error('Erro ao atualizar ficha técnica:', fichaError);
+      toast.error('Erro ao atualizar ficha técnica');
       return;
     }
 
-    // Usar fichaAtualizada para acessar os dados atualizados
     const fichaAtual = fichaAtualizada;
 
-    // 2. Atualizar os itens (simplificado: deleta tudo e reinsere)
     await supabase.from('itens_ficha').delete().eq('ficha_id', id);
     
     const itens = [
@@ -394,7 +388,6 @@ export function useStorage() {
       );
     }
 
-    // 3. Atualizar receitas base
     await supabase.from('receitas_base_ficha').delete().eq('ficha_produto_id', id);
     
     if (updates.receitasBaseIds && updates.receitasBaseIds.length > 0) {
@@ -406,7 +399,6 @@ export function useStorage() {
       );
     }
 
-    // 4. Atualizar o estado local com os dados mais recentes
     setData(prev => ({
       ...prev,
       fichasTecnicas: prev.fichasTecnicas.map(f => 
@@ -426,6 +418,7 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao deletar ficha técnica:', error);
+      toast.error('Erro ao deletar ficha técnica');
       return;
     }
 
@@ -451,6 +444,7 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao adicionar produção:', error);
+      toast.error('Erro ao adicionar produção');
       return;
     }
 
@@ -473,6 +467,7 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao deletar produção:', error);
+      toast.error('Erro ao deletar produção');
       return;
     }
 
@@ -498,6 +493,7 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao adicionar transação:', error);
+      toast.error('Erro ao adicionar transação');
       return;
     }
 
@@ -520,6 +516,7 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao deletar transação:', error);
+      toast.error('Erro ao deletar transação');
       return;
     }
 
@@ -545,6 +542,7 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao adicionar conta:', error);
+      toast.error('Erro ao adicionar conta');
       return;
     }
 
@@ -569,6 +567,7 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao atualizar conta:', error);
+      toast.error('Erro ao atualizar conta');
       return;
     }
 
@@ -589,6 +588,7 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao deletar conta:', error);
+      toast.error('Erro ao deletar conta');
       return;
     }
 
@@ -614,6 +614,7 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao adicionar meta:', error);
+      toast.error('Erro ao adicionar meta');
       return;
     }
 
@@ -638,6 +639,7 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao atualizar meta:', error);
+      toast.error('Erro ao atualizar meta');
       return;
     }
 
@@ -658,6 +660,7 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao deletar meta:', error);
+      toast.error('Erro ao deletar meta');
       return;
     }
 
@@ -671,10 +674,8 @@ export function useStorage() {
   const updateConfiguracoes = useCallback(async (config: Partial<Configuracoes>) => {
     if (!user) return;
 
-    // Separar custos fixos e variáveis
     const { custosFixos, custosVariaveis, ...configRest } = config;
 
-    // 1. Atualizar ou inserir configurações
     const { error: configError } = await supabase
       .from('configuracoes')
       .upsert({
@@ -685,11 +686,10 @@ export function useStorage() {
 
     if (configError) {
       console.error('Erro ao atualizar configurações:', configError);
+      toast.error('Erro ao atualizar configurações');
     }
 
-    // 2. Atualizar custos fixos
     if (custosFixos) {
-      // Deletar todos e reinserir (simplificado)
       await supabase.from('custos_fixos').delete().eq('user_id', user.id);
       
       if (custosFixos.length > 0) {
@@ -699,7 +699,6 @@ export function useStorage() {
       }
     }
 
-    // 3. Atualizar custos variáveis
     if (custosVariaveis) {
       await supabase.from('custos_variaveis').delete().eq('user_id', user.id);
       
@@ -710,21 +709,23 @@ export function useStorage() {
       }
     }
 
-    // 4. Atualizar estado local
     setData(prev => ({
       ...prev,
       configuracoes: { ...prev.configuracoes, ...config },
     }));
   }, [user]);
 
-  // ========== CATEGORIAS DE CONTAS ==========
+  // ========== CATEGORIAS DE CONTAS (CORRIGIDO) ==========
   const addCategoriaConta = useCallback(async (categoria: Omit<CategoriaConta, 'id'>) => {
     if (!user) return;
 
     const { data: result, error } = await supabase
       .from('categorias_contas')
       .insert([{
-        ...categoria,
+        nome: categoria.nome,
+        tipo: categoria.tipo,
+        limite_gasto: categoria.limiteGasto, // ← CORREÇÃO: limite_gasto
+        cor: categoria.cor,
         user_id: user.id,
       }])
       .select()
@@ -732,23 +733,39 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao adicionar categoria de conta:', error);
+      toast.error('Erro ao adicionar categoria de conta');
       return;
     }
 
+    // Converter de volta para o formato do app
+    const novaCategoria: CategoriaConta = {
+      id: result.id,
+      nome: result.nome,
+      tipo: result.tipo,
+      limiteGasto: result.limite_gasto, // ← CONVERSÃO
+      cor: result.cor,
+    };
+
     setData(prev => ({
       ...prev,
-      categoriasConta: [...prev.categoriasConta, result],
+      categoriasConta: [...prev.categoriasConta, novaCategoria],
     }));
 
-    return result;
+    return novaCategoria;
   }, [user]);
 
   const updateCategoriaConta = useCallback(async (id: string, updates: Partial<CategoriaConta>) => {
     if (!user) return;
 
+    const dbUpdates: any = {};
+    if (updates.nome !== undefined) dbUpdates.nome = updates.nome;
+    if (updates.tipo !== undefined) dbUpdates.tipo = updates.tipo;
+    if (updates.limiteGasto !== undefined) dbUpdates.limite_gasto = updates.limiteGasto; // ← CORREÇÃO
+    if (updates.cor !== undefined) dbUpdates.cor = updates.cor;
+
     const { data: result, error } = await supabase
       .from('categorias_contas')
-      .update(updates)
+      .update(dbUpdates)
       .eq('id', id)
       .eq('user_id', user.id)
       .select()
@@ -756,12 +773,22 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao atualizar categoria de conta:', error);
+      toast.error('Erro ao atualizar categoria de conta');
       return;
     }
 
+    // Converter de volta
+    const categoriaAtualizada: CategoriaConta = {
+      id: result.id,
+      nome: result.nome,
+      tipo: result.tipo,
+      limiteGasto: result.limite_gasto, // ← CONVERSÃO
+      cor: result.cor,
+    };
+
     setData(prev => ({
       ...prev,
-      categoriasConta: prev.categoriasConta.map(c => c.id === id ? result : c),
+      categoriasConta: prev.categoriasConta.map(c => c.id === id ? categoriaAtualizada : c),
     }));
   }, [user]);
 
@@ -776,6 +803,7 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao deletar categoria de conta:', error);
+      toast.error('Erro ao deletar categoria de conta');
       return;
     }
 
@@ -785,14 +813,16 @@ export function useStorage() {
     }));
   }, [user]);
 
-  // ========== CATEGORIAS DE PRODUTOS ==========
+  // ========== CATEGORIAS DE PRODUTOS (CORRIGIDO) ==========
   const addCategoriaProduto = useCallback(async (categoria: Omit<CategoriaProduto, 'id'>) => {
     if (!user) return;
 
     const { data: result, error } = await supabase
       .from('categorias_produtos')
       .insert([{
-        ...categoria,
+        nome: categoria.nome,
+        margem_padrao: categoria.margemPadrao, // ← CORREÇÃO: margem_padrao
+        cor: categoria.cor,
         user_id: user.id,
       }])
       .select()
@@ -800,23 +830,37 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao adicionar categoria de produto:', error);
+      toast.error('Erro ao adicionar categoria de produto');
       return;
     }
 
+    // Converter de volta para o formato do app
+    const novaCategoria: CategoriaProduto = {
+      id: result.id,
+      nome: result.nome,
+      margemPadrao: result.margem_padrao, // ← CONVERSÃO
+      cor: result.cor,
+    };
+
     setData(prev => ({
       ...prev,
-      categoriasProduto: [...prev.categoriasProduto, result],
+      categoriasProduto: [...prev.categoriasProduto, novaCategoria],
     }));
 
-    return result;
+    return novaCategoria;
   }, [user]);
 
   const updateCategoriaProduto = useCallback(async (id: string, updates: Partial<CategoriaProduto>) => {
     if (!user) return;
 
+    const dbUpdates: any = {};
+    if (updates.nome !== undefined) dbUpdates.nome = updates.nome;
+    if (updates.margemPadrao !== undefined) dbUpdates.margem_padrao = updates.margemPadrao; // ← CORREÇÃO
+    if (updates.cor !== undefined) dbUpdates.cor = updates.cor;
+
     const { data: result, error } = await supabase
       .from('categorias_produtos')
-      .update(updates)
+      .update(dbUpdates)
       .eq('id', id)
       .eq('user_id', user.id)
       .select()
@@ -824,12 +868,21 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao atualizar categoria de produto:', error);
+      toast.error('Erro ao atualizar categoria de produto');
       return;
     }
 
+    // Converter de volta
+    const categoriaAtualizada: CategoriaProduto = {
+      id: result.id,
+      nome: result.nome,
+      margemPadrao: result.margem_padrao, // ← CONVERSÃO
+      cor: result.cor,
+    };
+
     setData(prev => ({
       ...prev,
-      categoriasProduto: prev.categoriasProduto.map(c => c.id === id ? result : c),
+      categoriasProduto: prev.categoriasProduto.map(c => c.id === id ? categoriaAtualizada : c),
     }));
   }, [user]);
 
@@ -844,6 +897,7 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao deletar categoria de produto:', error);
+      toast.error('Erro ao deletar categoria de produto');
       return;
     }
 
