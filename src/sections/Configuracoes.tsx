@@ -20,7 +20,15 @@ interface ConfiguracoesProps {
 
 export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
   const { user } = useAuth();
-  const { updateConfiguracoes } = useStorage();
+  const { 
+    updateConfiguracoes,
+    addCategoriaConta,
+    updateCategoriaConta,
+    deleteCategoriaConta,
+    addCategoriaProduto,
+    updateCategoriaProduto,
+    deleteCategoriaProduto
+  } = useStorage();
   
   const [activeTab, setActiveTab] = useState('geral');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -86,11 +94,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     const novosCustosFixos = [...(configuracoes.custosFixos || []), novo];
     await updateConfiguracoes({ custosFixos: novosCustosFixos });
     
-    // ATUALIZAÇÃO DIRETA NO DATA
-    if (data?.configuracoes) {
-      data.configuracoes.custosFixos = novosCustosFixos;
-    }
-    
     setNomeFixo('');
     setValorFixo('');
     toast.success('Custo fixo adicionado com sucesso!');
@@ -113,11 +116,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
 
     const novosCustosFixos = (configuracoes.custosFixos || []).filter((c: CustoFixo) => c.id !== id);
     await updateConfiguracoes({ custosFixos: novosCustosFixos });
-    
-    // ATUALIZAÇÃO DIRETA NO DATA
-    if (data?.configuracoes) {
-      data.configuracoes.custosFixos = novosCustosFixos;
-    }
     
     toast.success('Custo fixo removido!');
   };
@@ -152,11 +150,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
         : custo
     );
     await updateConfiguracoes({ custosFixos: custosAtualizados });
-    
-    // ATUALIZAÇÃO DIRETA NO DATA
-    if (data?.configuracoes) {
-      data.configuracoes.custosFixos = custosAtualizados;
-    }
     
     setEditandoFixo(null);
     setNomeFixo('');
@@ -195,11 +188,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     const novosCustosVariaveis = [...(configuracoes.custosVariaveis || []), novo];
     await updateConfiguracoes({ custosVariaveis: novosCustosVariaveis });
     
-    // ATUALIZAÇÃO DIRETA NO DATA
-    if (data?.configuracoes) {
-      data.configuracoes.custosVariaveis = novosCustosVariaveis;
-    }
-    
     setNomeVariavel('');
     setValorVariavel('');
     toast.success('Custo variável adicionado!');
@@ -222,11 +210,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
 
     const novosCustosVariaveis = (configuracoes.custosVariaveis || []).filter((c: CustoVariavel) => c.id !== id);
     await updateConfiguracoes({ custosVariaveis: novosCustosVariaveis });
-    
-    // ATUALIZAÇÃO DIRETA NO DATA
-    if (data?.configuracoes) {
-      data.configuracoes.custosVariaveis = novosCustosVariaveis;
-    }
     
     toast.success('Custo variável removido!');
   };
@@ -262,11 +245,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     );
     await updateConfiguracoes({ custosVariaveis: custosAtualizados });
     
-    // ATUALIZAÇÃO DIRETA NO DATA
-    if (data?.configuracoes) {
-      data.configuracoes.custosVariaveis = custosAtualizados;
-    }
-    
     setEditandoVariavel(null);
     setNomeVariavel('');
     setValorVariavel('');
@@ -279,41 +257,20 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     setValorVariavel('');
   };
 
-  // ========== CATEGORIAS DE CONTAS (CORRIGIDO) ==========
+  // ========== CATEGORIAS DE CONTAS (USANDO USESTORAGE) ==========
   const handleAddCategoriaConta = async () => {
     if (!user || !nome) return;
 
-    // CORREÇÃO: Converter limiteGasto corretamente
     const limiteGastoValue = limiteGasto && limiteGasto.trim() !== '' ? parseFloat(limiteGasto) : null;
 
-    const novaCategoria = {
-      user_id: user.id,
+    // Usar a função do useStorage que já atualiza o estado global
+    await addCategoriaConta({
       nome,
       tipo,
-      limite_gasto: limiteGastoValue,
+      limiteGasto: limiteGastoValue,
       cor,
-    };
-
-    const { data: nova, error } = await supabase
-      .from('categorias_contas')
-      .insert([novaCategoria])
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Erro ao adicionar categoria de conta:', error);
-      toast.error('Erro ao adicionar categoria');
-      return;
-    }
-
-    // CORREÇÃO: Criar NOVO array para forçar re-render
-    if (data?.categoriasConta) {
-      data.categoriasConta = [...data.categoriasConta, nova];
-    } else if (data) {
-      data.categoriasConta = [nova];
-    }
+    });
     
-    // Forçar re-render
     setNome('');
     setCor('#f472b6');
     setTipo('fixa');
@@ -335,31 +292,13 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
 
     const limiteGastoValue = limiteGasto && limiteGasto.trim() !== '' ? parseFloat(limiteGasto) : null;
 
-    const { error } = await supabase
-      .from('categorias_contas')
-      .update({
-        nome,
-        tipo,
-        limite_gasto: limiteGastoValue,
-        cor,
-      })
-      .eq('id', id)
-      .eq('user_id', user.id);
-
-    if (error) {
-      console.error('Erro ao atualizar categoria de conta:', error);
-      toast.error('Erro ao atualizar categoria');
-      return;
-    }
-
-    // CORREÇÃO: Criar NOVO array com o item atualizado
-    if (data?.categoriasConta) {
-      data.categoriasConta = data.categoriasConta.map((c: any) => 
-        c.id === id 
-          ? { ...c, nome, tipo, limiteGasto: limiteGastoValue, cor }
-          : c
-      );
-    }
+    // Usar a função do useStorage
+    await updateCategoriaConta(id, {
+      nome,
+      tipo,
+      limiteGasto: limiteGastoValue,
+      cor,
+    });
 
     setEditandoCategoria(null);
     resetCategoriaForm();
@@ -369,23 +308,8 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
   const handleDeleteCategoriaConta = async (id: string) => {
     if (!user) return;
 
-    const { error } = await supabase
-      .from('categorias_contas')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', user.id);
-
-    if (error) {
-      console.error('Erro ao deletar categoria de conta:', error);
-      toast.error('Erro ao deletar categoria');
-      return;
-    }
-
-    // CORREÇÃO: Criar NOVO array sem o item deletado
-    if (data?.categoriasConta) {
-      data.categoriasConta = data.categoriasConta.filter((c: any) => c.id !== id);
-    }
-    
+    // Usar a função do useStorage
+    await deleteCategoriaConta(id);
     toast.success('Categoria deletada!');
   };
 
@@ -394,44 +318,23 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     resetCategoriaForm();
   };
 
-  // ========== CATEGORIAS DE PRODUTOS (CORRIGIDO) ==========
+  // ========== CATEGORIAS DE PRODUTOS (USANDO USESTORAGE) ==========
   const handleAddCategoriaProduto = async () => {
     if (!user || !nome || !margemPadrao) return;
 
-    // CORREÇÃO: Garantir que margemPadrao seja um número válido
     const margemValue = parseFloat(margemPadrao);
     if (isNaN(margemValue) || margemValue <= 0) {
       toast.error('Margem padrão deve ser um número válido maior que zero');
       return;
     }
 
-    const novaCategoria = {
-      user_id: user.id,
+    // Usar a função do useStorage que já atualiza o estado global
+    await addCategoriaProduto({
       nome,
-      margem_padrao: margemValue,
+      margemPadrao: margemValue,
       cor,
-    };
-
-    const { data: nova, error } = await supabase
-      .from('categorias_produtos')
-      .insert([novaCategoria])
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Erro ao adicionar categoria de produto:', error);
-      toast.error('Erro ao adicionar categoria');
-      return;
-    }
-
-    // CORREÇÃO: Criar NOVO array para forçar re-render
-    if (data?.categoriasProduto) {
-      data.categoriasProduto = [...data.categoriasProduto, nova];
-    } else if (data) {
-      data.categoriasProduto = [nova];
-    }
+    });
     
-    // Forçar re-render
     setNome('');
     setCor('#f472b6');
     setMargemPadrao('');
@@ -455,30 +358,12 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    const { error } = await supabase
-      .from('categorias_produtos')
-      .update({
-        nome,
-        margem_padrao: margemValue,
-        cor,
-      })
-      .eq('id', id)
-      .eq('user_id', user.id);
-
-    if (error) {
-      console.error('Erro ao atualizar categoria de produto:', error);
-      toast.error('Erro ao atualizar categoria');
-      return;
-    }
-
-    // CORREÇÃO: Criar NOVO array com o item atualizado
-    if (data?.categoriasProduto) {
-      data.categoriasProduto = data.categoriasProduto.map((c: any) => 
-        c.id === id 
-          ? { ...c, nome, margemPadrao: margemValue, cor }
-          : c
-      );
-    }
+    // Usar a função do useStorage
+    await updateCategoriaProduto(id, {
+      nome,
+      margemPadrao: margemValue,
+      cor,
+    });
 
     setEditandoCategoria(null);
     resetCategoriaForm();
@@ -488,23 +373,8 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
   const handleDeleteCategoriaProduto = async (id: string) => {
     if (!user) return;
 
-    const { error } = await supabase
-      .from('categorias_produtos')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', user.id);
-
-    if (error) {
-      console.error('Erro ao deletar categoria de produto:', error);
-      toast.error('Erro ao deletar categoria');
-      return;
-    }
-
-    // CORREÇÃO: Criar NOVO array sem o item deletado
-    if (data?.categoriasProduto) {
-      data.categoriasProduto = data.categoriasProduto.filter((c: any) => c.id !== id);
-    }
-    
+    // Usar a função do useStorage
+    await deleteCategoriaProduto(id);
     toast.success('Categoria deletada!');
   };
 
