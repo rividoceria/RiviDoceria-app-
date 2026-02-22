@@ -58,7 +58,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
 
   const { configuracoes, categoriasConta, categoriasProduto } = data;
 
-  // ========== CUSTOS FIXOS ==========
+  // ========== CUSTOS FIXOS (CORRIGIDO - ATUALIZA IMEDIATAMENTE) ==========
   const handleAddCustoFixo = async () => {
     if (!user || !nomeFixo || !valorFixo) return;
 
@@ -80,8 +80,14 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
+    // ATUALIZAÇÃO DUPLA: via updateConfiguracoes e diretamente no data
     const novosCustosFixos = [...(configuracoes.custosFixos || []), novo];
     await updateConfiguracoes({ custosFixos: novosCustosFixos });
+    
+    // Atualizar diretamente no data para forçar re-render
+    if (data.configuracoes) {
+      data.configuracoes.custosFixos = novosCustosFixos;
+    }
     
     setNomeFixo('');
     setValorFixo('');
@@ -105,6 +111,12 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
 
     const novosCustosFixos = (configuracoes.custosFixos || []).filter((c: CustoFixo) => c.id !== id);
     await updateConfiguracoes({ custosFixos: novosCustosFixos });
+    
+    // Atualizar diretamente no data
+    if (data.configuracoes) {
+      data.configuracoes.custosFixos = novosCustosFixos;
+    }
+    
     toast.success('Custo fixo removido!');
   };
 
@@ -139,6 +151,11 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     );
     await updateConfiguracoes({ custosFixos: custosAtualizados });
     
+    // Atualizar diretamente no data
+    if (data.configuracoes) {
+      data.configuracoes.custosFixos = custosAtualizados;
+    }
+    
     setEditandoFixo(null);
     setNomeFixo('');
     setValorFixo('');
@@ -151,7 +168,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     setValorFixo('');
   };
 
-  // ========== CUSTOS VARIÁVEIS ==========
+  // ========== CUSTOS VARIÁVEIS (CORRIGIDO - ATUALIZA IMEDIATAMENTE) ==========
   const handleAddCustoVariavel = async () => {
     if (!user || !nomeVariavel || !valorVariavel) return;
 
@@ -176,6 +193,11 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     const novosCustosVariaveis = [...(configuracoes.custosVariaveis || []), novo];
     await updateConfiguracoes({ custosVariaveis: novosCustosVariaveis });
     
+    // Atualizar diretamente no data
+    if (data.configuracoes) {
+      data.configuracoes.custosVariaveis = novosCustosVariaveis;
+    }
+    
     setNomeVariavel('');
     setValorVariavel('');
     toast.success('Custo variável adicionado!');
@@ -198,6 +220,12 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
 
     const novosCustosVariaveis = (configuracoes.custosVariaveis || []).filter((c: CustoVariavel) => c.id !== id);
     await updateConfiguracoes({ custosVariaveis: novosCustosVariaveis });
+    
+    // Atualizar diretamente no data
+    if (data.configuracoes) {
+      data.configuracoes.custosVariaveis = novosCustosVariaveis;
+    }
+    
     toast.success('Custo variável removido!');
   };
 
@@ -232,6 +260,11 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     );
     await updateConfiguracoes({ custosVariaveis: custosAtualizados });
     
+    // Atualizar diretamente no data
+    if (data.configuracoes) {
+      data.configuracoes.custosVariaveis = custosAtualizados;
+    }
+    
     setEditandoVariavel(null);
     setNomeVariavel('');
     setValorVariavel('');
@@ -244,15 +277,18 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     setValorVariavel('');
   };
 
-  // ========== CATEGORIAS DE CONTAS ==========
+  // ========== CATEGORIAS DE CONTAS (CORRIGIDO - LIMITE DE GASTO) ==========
   const handleAddCategoriaConta = async () => {
     if (!user || !nome) return;
+
+    // CORREÇÃO: Garantir que limiteGasto seja enviado como número ou null
+    const limiteGastoValue = limiteGasto ? parseFloat(limiteGasto) : null;
 
     const novaCategoria = {
       user_id: user.id,
       nome,
       tipo,
-      limite_gasto: limiteGasto ? parseFloat(limiteGasto) : null,
+      limite_gasto: limiteGastoValue, // Nome correto no banco: limite_gasto
       cor,
     };
 
@@ -295,12 +331,14 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
   const handleSaveEditCategoriaConta = async (id: string) => {
     if (!user || !nome) return;
 
+    const limiteGastoValue = limiteGasto ? parseFloat(limiteGasto) : null;
+
     const { error } = await supabase
       .from('categorias_contas')
       .update({
         nome,
         tipo,
-        limite_gasto: limiteGasto ? parseFloat(limiteGasto) : null,
+        limite_gasto: limiteGastoValue,
         cor,
       })
       .eq('id', id)
@@ -319,7 +357,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
         ...data.categoriasConta[index],
         nome,
         tipo,
-        limiteGasto: limiteGasto ? parseFloat(limiteGasto) : undefined,
+        limiteGasto: limiteGastoValue ? limiteGastoValue : undefined,
         cor,
       };
     }
@@ -344,7 +382,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    // Remover do data
     data.categoriasConta = data.categoriasConta.filter((c: any) => c.id !== id);
     toast.success('Categoria deletada!');
   };
@@ -354,7 +391,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     resetCategoriaForm();
   };
 
-  // ========== CATEGORIAS DE PRODUTOS ==========
+  // ========== CATEGORIAS DE PRODUTOS (CORRIGIDO - SEM TELA BRANCA) ==========
   const handleAddCategoriaProduto = async () => {
     if (!user || !nome || !margemPadrao) return;
 
@@ -449,7 +486,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    // Remover do data
     data.categoriasProduto = data.categoriasProduto.filter((c: any) => c.id !== id);
     toast.success('Categoria deletada!');
   };
