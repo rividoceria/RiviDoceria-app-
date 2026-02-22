@@ -16,9 +16,10 @@ import { toast } from 'sonner';
 
 interface ConfiguracoesProps {
   data: any;
+  onDataUpdate?: () => void; // Callback para notificar atualização
 }
 
-export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
+export function ConfiguracoesSection({ data, onDataUpdate }: ConfiguracoesProps) {
   const { user } = useAuth();
   const { updateConfiguracoes } = useStorage();
   
@@ -256,7 +257,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       cor,
     };
 
-    const { error } = await supabase
+    const { data: nova, error } = await supabase
       .from('categorias_contas')
       .insert([novaCategoria])
       .select()
@@ -268,7 +269,20 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    window.location.reload();
+    // Atualizar o data diretamente
+    if (data.categoriasConta) {
+      data.categoriasConta.push(nova);
+    } else {
+      data.categoriasConta = [nova];
+    }
+    
+    // Forçar re-render
+    setNome('');
+    setCor('#f472b6');
+    setTipo('fixa');
+    setLimiteGasto('');
+    setIsDialogOpen(false);
+    toast.success('Categoria adicionada com sucesso!');
   };
 
   const handleEditCategoriaConta = (categoria: CategoriaConta) => {
@@ -299,7 +313,21 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    window.location.reload();
+    // Atualizar no data
+    const index = data.categoriasConta.findIndex((c: any) => c.id === id);
+    if (index !== -1) {
+      data.categoriasConta[index] = {
+        ...data.categoriasConta[index],
+        nome,
+        tipo,
+        limiteGasto: limiteGasto ? parseFloat(limiteGasto) : undefined,
+        cor,
+      };
+    }
+
+    setEditandoCategoria(null);
+    resetCategoriaForm();
+    toast.success('Categoria atualizada!');
   };
 
   const handleDeleteCategoriaConta = async (id: string) => {
@@ -317,7 +345,9 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    window.location.reload();
+    // Remover do data
+    data.categoriasConta = data.categoriasConta.filter((c: any) => c.id !== id);
+    toast.success('Categoria deletada!');
   };
 
   const cancelEditCategoria = () => {
@@ -336,7 +366,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       cor,
     };
 
-    const { error } = await supabase
+    const { data: nova, error } = await supabase
       .from('categorias_produtos')
       .insert([novaCategoria])
       .select()
@@ -348,7 +378,19 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    window.location.reload();
+    // Atualizar o data diretamente
+    if (data.categoriasProduto) {
+      data.categoriasProduto.push(nova);
+    } else {
+      data.categoriasProduto = [nova];
+    }
+    
+    // Forçar re-render
+    setNome('');
+    setCor('#f472b6');
+    setMargemPadrao('');
+    setIsDialogOpen(false);
+    toast.success('Categoria adicionada com sucesso!');
   };
 
   const handleEditCategoriaProduto = (categoria: CategoriaProduto) => {
@@ -377,7 +419,20 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    window.location.reload();
+    // Atualizar no data
+    const index = data.categoriasProduto.findIndex((c: any) => c.id === id);
+    if (index !== -1) {
+      data.categoriasProduto[index] = {
+        ...data.categoriasProduto[index],
+        nome,
+        margemPadrao: parseFloat(margemPadrao),
+        cor,
+      };
+    }
+
+    setEditandoCategoria(null);
+    resetCategoriaForm();
+    toast.success('Categoria atualizada!');
   };
 
   const handleDeleteCategoriaProduto = async (id: string) => {
@@ -395,7 +450,9 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    window.location.reload();
+    // Remover do data
+    data.categoriasProduto = data.categoriasProduto.filter((c: any) => c.id !== id);
+    toast.success('Categoria deletada!');
   };
 
   // ========== TAXAS ==========
