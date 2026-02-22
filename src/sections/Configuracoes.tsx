@@ -256,7 +256,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       cor,
     };
 
-    const { data: nova, error } = await supabase
+    const { error } = await supabase
       .from('categorias_contas')
       .insert([novaCategoria])
       .select()
@@ -268,7 +268,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    // Forçar atualização do estado local de forma segura
     window.location.reload();
   };
 
@@ -337,7 +336,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       cor,
     };
 
-    const { data: nova, error } = await supabase
+    const { error } = await supabase
       .from('categorias_produtos')
       .insert([novaCategoria])
       .select()
