@@ -46,17 +46,20 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
   const [margemPadrao, setMargemPadrao] = useState('');
 
   // Estados para taxas
-  const [taxas, setTaxas] = useState(data.configuracoes?.taxas || { pix: 0, debito: 1.5, credito: 3.5 });
+  const [taxas, setTaxas] = useState(data?.configuracoes?.taxas || { pix: 0, debito: 1.5, credito: 3.5 });
 
   // Estados para margens
-  const [cmvPercentual, setCmvPercentual] = useState(data.configuracoes?.cmvPercentualPadrao?.toString() || '30');
-  const [margemLucro, setMargemLucro] = useState(data.configuracoes?.margemLucroPadrao?.toString() || '60');
+  const [cmvPercentual, setCmvPercentual] = useState(data?.configuracoes?.cmvPercentualPadrao?.toString() || '30');
+  const [margemLucro, setMargemLucro] = useState(data?.configuracoes?.margemLucroPadrao?.toString() || '60');
 
   // Estados para configurações gerais
-  const [nomeEstabelecimento, setNomeEstabelecimento] = useState(data.configuracoes?.nomeEstabelecimento || '');
-  const [logoUrl, setLogoUrl] = useState(data.configuracoes?.logoUrl || '');
+  const [nomeEstabelecimento, setNomeEstabelecimento] = useState(data?.configuracoes?.nomeEstabelecimento || '');
+  const [logoUrl, setLogoUrl] = useState(data?.configuracoes?.logoUrl || '');
 
-  const { configuracoes, categoriasConta, categoriasProduto } = data;
+  // Garantir que data tenha as propriedades necessárias
+  const configuracoes = data?.configuracoes || { custosFixos: [], custosVariaveis: [] };
+  const categoriasConta = data?.categoriasConta || [];
+  const categoriasProduto = data?.categoriasProduto || [];
 
   // ========== CUSTOS FIXOS (CORRIGIDO - ATUALIZA IMEDIATAMENTE) ==========
   const handleAddCustoFixo = async () => {
@@ -85,7 +88,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     await updateConfiguracoes({ custosFixos: novosCustosFixos });
     
     // Atualizar diretamente no data para forçar re-render
-    if (data.configuracoes) {
+    if (data?.configuracoes) {
       data.configuracoes.custosFixos = novosCustosFixos;
     }
     
@@ -113,7 +116,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     await updateConfiguracoes({ custosFixos: novosCustosFixos });
     
     // Atualizar diretamente no data
-    if (data.configuracoes) {
+    if (data?.configuracoes) {
       data.configuracoes.custosFixos = novosCustosFixos;
     }
     
@@ -152,7 +155,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     await updateConfiguracoes({ custosFixos: custosAtualizados });
     
     // Atualizar diretamente no data
-    if (data.configuracoes) {
+    if (data?.configuracoes) {
       data.configuracoes.custosFixos = custosAtualizados;
     }
     
@@ -194,7 +197,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     await updateConfiguracoes({ custosVariaveis: novosCustosVariaveis });
     
     // Atualizar diretamente no data
-    if (data.configuracoes) {
+    if (data?.configuracoes) {
       data.configuracoes.custosVariaveis = novosCustosVariaveis;
     }
     
@@ -222,7 +225,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     await updateConfiguracoes({ custosVariaveis: novosCustosVariaveis });
     
     // Atualizar diretamente no data
-    if (data.configuracoes) {
+    if (data?.configuracoes) {
       data.configuracoes.custosVariaveis = novosCustosVariaveis;
     }
     
@@ -261,7 +264,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     await updateConfiguracoes({ custosVariaveis: custosAtualizados });
     
     // Atualizar diretamente no data
-    if (data.configuracoes) {
+    if (data?.configuracoes) {
       data.configuracoes.custosVariaveis = custosAtualizados;
     }
     
@@ -305,9 +308,9 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     }
 
     // Atualizar o data diretamente
-    if (data.categoriasConta) {
+    if (data?.categoriasConta) {
       data.categoriasConta.push(nova);
-    } else {
+    } else if (data) {
       data.categoriasConta = [nova];
     }
     
@@ -351,15 +354,17 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     }
 
     // Atualizar no data
-    const index = data.categoriasConta.findIndex((c: any) => c.id === id);
-    if (index !== -1) {
-      data.categoriasConta[index] = {
-        ...data.categoriasConta[index],
-        nome,
-        tipo,
-        limiteGasto: limiteGastoValue ? limiteGastoValue : undefined,
-        cor,
-      };
+    if (data?.categoriasConta) {
+      const index = data.categoriasConta.findIndex((c: any) => c.id === id);
+      if (index !== -1) {
+        data.categoriasConta[index] = {
+          ...data.categoriasConta[index],
+          nome,
+          tipo,
+          limiteGasto: limiteGastoValue ? limiteGastoValue : undefined,
+          cor,
+        };
+      }
     }
 
     setEditandoCategoria(null);
@@ -382,7 +387,9 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    data.categoriasConta = data.categoriasConta.filter((c: any) => c.id !== id);
+    if (data?.categoriasConta) {
+      data.categoriasConta = data.categoriasConta.filter((c: any) => c.id !== id);
+    }
     toast.success('Categoria deletada!');
   };
 
@@ -415,9 +422,9 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     }
 
     // Atualizar o data diretamente
-    if (data.categoriasProduto) {
+    if (data?.categoriasProduto) {
       data.categoriasProduto.push(nova);
-    } else {
+    } else if (data) {
       data.categoriasProduto = [nova];
     }
     
@@ -456,14 +463,16 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     }
 
     // Atualizar no data
-    const index = data.categoriasProduto.findIndex((c: any) => c.id === id);
-    if (index !== -1) {
-      data.categoriasProduto[index] = {
-        ...data.categoriasProduto[index],
-        nome,
-        margemPadrao: parseFloat(margemPadrao),
-        cor,
-      };
+    if (data?.categoriasProduto) {
+      const index = data.categoriasProduto.findIndex((c: any) => c.id === id);
+      if (index !== -1) {
+        data.categoriasProduto[index] = {
+          ...data.categoriasProduto[index],
+          nome,
+          margemPadrao: parseFloat(margemPadrao),
+          cor,
+        };
+      }
     }
 
     setEditandoCategoria(null);
@@ -486,7 +495,9 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    data.categoriasProduto = data.categoriasProduto.filter((c: any) => c.id !== id);
+    if (data?.categoriasProduto) {
+      data.categoriasProduto = data.categoriasProduto.filter((c: any) => c.id !== id);
+    }
     toast.success('Categoria deletada!');
   };
 
@@ -646,6 +657,15 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
 
   const totalFixos = (configuracoes.custosFixos || []).reduce((acc: number, c: CustoFixo) => acc + (c?.valor || 0), 0);
   const totalVariaveis = (configuracoes.custosVariaveis || []).reduce((acc: number, c: CustoVariavel) => acc + (c?.valor || 0), 0);
+
+  // Se não houver dados, mostrar loading
+  if (!data) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <p className="text-gray-500">Carregando configurações...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
