@@ -268,12 +268,8 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    // Atualizar via data (já que não temos uma função específica)
-    data.categoriasConta = [...(categoriasConta || []), nova];
-    
-    resetCategoriaForm();
-    setIsDialogOpen(false);
-    toast.success('Categoria adicionada com sucesso!');
+    // Forçar atualização do estado local de forma segura
+    window.location.reload();
   };
 
   const handleEditCategoriaConta = (categoria: CategoriaConta) => {
@@ -304,21 +300,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    // Atualizar via data
-    const index = data.categoriasConta.findIndex((c: CategoriaConta) => c.id === id);
-    if (index !== -1) {
-      data.categoriasConta[index] = {
-        ...data.categoriasConta[index],
-        nome,
-        tipo,
-        limiteGasto: limiteGasto ? parseFloat(limiteGasto) : undefined,
-        cor,
-      };
-    }
-
-    setEditandoCategoria(null);
-    resetCategoriaForm();
-    toast.success('Categoria atualizada!');
+    window.location.reload();
   };
 
   const handleDeleteCategoriaConta = async (id: string) => {
@@ -336,9 +318,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    // Atualizar via data
-    data.categoriasConta = (categoriasConta || []).filter((c: CategoriaConta) => c.id !== id);
-    toast.success('Categoria deletada!');
+    window.location.reload();
   };
 
   const cancelEditCategoria = () => {
@@ -369,12 +349,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    // Atualizar via data
-    data.categoriasProduto = [...(categoriasProduto || []), nova];
-    
-    resetCategoriaForm();
-    setIsDialogOpen(false);
-    toast.success('Categoria adicionada com sucesso!');
+    window.location.reload();
   };
 
   const handleEditCategoriaProduto = (categoria: CategoriaProduto) => {
@@ -403,20 +378,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    // Atualizar via data
-    const index = data.categoriasProduto.findIndex((c: CategoriaProduto) => c.id === id);
-    if (index !== -1) {
-      data.categoriasProduto[index] = {
-        ...data.categoriasProduto[index],
-        nome,
-        margemPadrao: parseFloat(margemPadrao),
-        cor,
-      };
-    }
-
-    setEditandoCategoria(null);
-    resetCategoriaForm();
-    toast.success('Categoria atualizada!');
+    window.location.reload();
   };
 
   const handleDeleteCategoriaProduto = async (id: string) => {
@@ -434,9 +396,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    // Atualizar via data
-    data.categoriasProduto = (categoriasProduto || []).filter((c: CategoriaProduto) => c.id !== id);
-    toast.success('Categoria deletada!');
+    window.location.reload();
   };
 
   // ========== TAXAS ==========
