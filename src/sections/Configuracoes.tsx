@@ -16,10 +16,9 @@ import { toast } from 'sonner';
 
 interface ConfiguracoesProps {
   data: any;
-  onDataUpdate?: () => void; // Callback para notificar atualização
 }
 
-export function ConfiguracoesSection({ data, onDataUpdate }: ConfiguracoesProps) {
+export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
   const { user } = useAuth();
   const { updateConfiguracoes } = useStorage();
   
