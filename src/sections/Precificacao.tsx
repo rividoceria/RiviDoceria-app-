@@ -14,26 +14,79 @@ interface PrecificacaoProps {
 }
 
 export function Precificacao({ data, onUpdateFicha }: PrecificacaoProps) {
+  // LOGS PARA DEBUG
+  console.log('=== PRECIFICACAO RENDERIZANDO ===');
+  console.log('data recebida:', data);
+  console.log('categoriasProduto:', data?.categoriasProduto);
+  console.log('fichasTecnicas:', data?.fichasTecnicas);
+  console.log('tipo de categoriasProduto:', typeof data?.categoriasProduto);
+  console.log('é array?', Array.isArray(data?.categoriasProduto));
+
+  // Verificações de segurança para evitar tela branca
+  if (!data) {
+    console.error('❌ ERRO: data é undefined!');
+    return (
+      <div className="p-8 text-center">
+        <h3 className="text-xl font-bold text-red-600 mb-2">Erro: Dados não carregados</h3>
+        <p className="text-gray-600">data é undefined</p>
+      </div>
+    );
+  }
+
+  if (!data.categoriasProduto) {
+    console.error('❌ ERRO: categoriasProduto é undefined!');
+    return (
+      <div className="p-8 text-center">
+        <h3 className="text-xl font-bold text-red-600 mb-2">Erro: Categorias não carregadas</h3>
+        <p className="text-gray-600">categoriasProduto é undefined</p>
+      </div>
+    );
+  }
+
+  if (!Array.isArray(data.categoriasProduto)) {
+    console.error('❌ ERRO: categoriasProduto não é um array!', data.categoriasProduto);
+    return (
+      <div className="p-8 text-center">
+        <h3 className="text-xl font-bold text-red-600 mb-2">Erro: Formato de dados inválido</h3>
+        <p className="text-gray-600">categoriasProduto não é um array</p>
+      </div>
+    );
+  }
+
   const [selectedFichaId, setSelectedFichaId] = useState<string>('');
   const [novoPreco, setNovoPreco] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // Verificações de segurança para evitar tela branca
   const produtos = useMemo(() => {
-    return (data?.fichasTecnicas || []).filter(f => f?.tipo === 'produto_final');
+    const result = (data?.fichasTecnicas || []).filter(f => f?.tipo === 'produto_final');
+    console.log('produtos filtrados:', result.length, 'encontrados');
+    return result;
   }, [data?.fichasTecnicas]);
 
   const categoriasProduto = useMemo(() => {
-    return data?.categoriasProduto || [];
+    const result = data?.categoriasProduto || [];
+    console.log('categoriasProduto (memo):', result.length, 'encontradas');
+    return result;
   }, [data?.categoriasProduto]);
 
   const produtosPorCategoria = useMemo(() => {
-    if (!categoriasProduto.length || !produtos.length) return [];
+    console.log('Calculando produtosPorCategoria...');
+    console.log('categorias disponíveis:', categoriasProduto.length);
+    console.log('produtos disponíveis:', produtos.length);
+    
+    if (!categoriasProduto.length || !produtos.length) {
+      console.log('Sem dados suficientes para agrupar');
+      return [];
+    }
     
     const grouped: Record<string, { categoria: typeof categoriasProduto[0]; produtos: typeof produtos }> = {};
     
     produtos.forEach(produto => {
-      if (!produto?.categoriaId) return;
+      if (!produto?.categoriaId) {
+        console.log('Produto sem categoriaId:', produto?.nome);
+        return;
+      }
       
       const cat = categoriasProduto.find(c => c?.id === produto.categoriaId);
       if (cat) {
@@ -41,10 +94,14 @@ export function Precificacao({ data, onUpdateFicha }: PrecificacaoProps) {
           grouped[cat.id] = { categoria: cat, produtos: [] };
         }
         grouped[cat.id].produtos.push(produto);
+      } else {
+        console.log('Categoria não encontrada para produto:', produto.nome, 'categoriaId:', produto.categoriaId);
       }
     });
 
-    return Object.values(grouped);
+    const result = Object.values(grouped);
+    console.log('produtosPorCategoria:', result.length, 'grupos criados');
+    return result;
   }, [produtos, categoriasProduto]);
 
   const handleAtualizarPreco = () => {
