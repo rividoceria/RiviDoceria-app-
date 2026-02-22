@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { MainLayout, type ModuleType } from '@/components/layout/MainLayout';
 import { Dashboard } from '@/sections/Dashboard';
@@ -20,8 +20,57 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import Auth from '@/sections/Auth';
 import AuthCallback from '@/sections/AuthCallback';
 import ResetPassword from '@/sections/ResetPassword';
+import { Button } from '@/components/ui/button';
 
-// Componente protegido que verifica autenticação
+// ========== ERROR BOUNDARY COMPONENT ==========
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('❌ ERRO CAPTURADO PELO ERROR BOUNDARY:');
+    console.error('Erro:', error);
+    console.error('Stack:', error.stack);
+    console.error('Component Stack:', errorInfo.componentStack);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+          <div className="max-w-2xl w-full bg-white rounded-xl shadow-lg p-8">
+            <h2 className="text-2xl font-bold text-red-600 mb-4">Ops! Algo deu errado</h2>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4 overflow-auto max-h-96">
+              <p className="text-red-800 font-mono text-sm whitespace-pre-wrap">
+                {this.state.error?.toString()}
+              </p>
+              <p className="text-red-700 font-mono text-xs mt-2 whitespace-pre-wrap">
+                {this.state.error?.stack}
+              </p>
+            </div>
+            <div className="flex gap-4">
+              <Button onClick={() => window.location.reload()} variant="default">
+                Recarregar Página
+              </Button>
+              <Button onClick={() => this.setState({ hasError: false, error: null })} variant="outline">
+                Tentar Novamente
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ========== COMPONENTES DE ROTA ==========
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const location = useLocation();
@@ -46,7 +95,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Componente que redireciona se já estiver logado
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
@@ -70,7 +118,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Componente principal do app (conteúdo protegido)
+// ========== COMPONENTE PRINCIPAL ==========
 function MainApp() {
   const [currentModule, setCurrentModule] = useState<ModuleType>('dashboard');
   const { signOut } = useAuth();
@@ -91,15 +139,15 @@ function MainApp() {
     addMeta,
     updateMeta,
     deleteMeta,
-    // Estas funções não estão sendo usadas diretamente no App
-    // updateConfiguracoes, ← REMOVIDO
-    // addCategoriaConta, ← REMOVIDO
-    // updateCategoriaConta, ← REMOVIDO
-    // deleteCategoriaConta, ← REMOVIDO
-    // addCategoriaProduto, ← REMOVIDO
-    // updateCategoriaProduto, ← REMOVIDO
-    // deleteCategoriaProduto, ← REMOVIDO
   } = useStorage();
+
+  // LOGS PARA DEBUG
+  console.log('=== MAINAPP RENDER ===');
+  console.log('isLoaded:', isLoaded);
+  console.log('data:', data);
+  console.log('categoriasProduto:', data?.categoriasProduto);
+  console.log('fichasTecnicas:', data?.fichasTecnicas);
+  console.log('produtos finais:', data?.fichasTecnicas?.filter((f: any) => f?.tipo === 'produto_final'));
 
   if (!isLoaded) {
     return (
@@ -138,77 +186,123 @@ function MainApp() {
   };
 
   const renderModule = () => {
-    switch (currentModule) {
-      case 'dashboard':
-        return <Dashboard data={data} />;
-      case 'caixa':
-        return (
-          <CaixaDiario
-            data={data}
-            onAddTransacao={handleAddTransacao}
-            onDeleteTransacao={deleteTransacao}
-          />
-        );
-      case 'contas':
-        return (
-          <ContasPagar
-            data={data}
-            onAddConta={addContaPagar}
-            onUpdateConta={updateContaPagar}
-            onDeleteConta={deleteContaPagar}
-          />
-        );
-      case 'resultado':
-        return <ResultadoMensal data={data} />;
-      case 'metas':
-        return (
-          <Metas
-            data={data}
-            onAddMeta={handleAddMeta}
-            onUpdateMeta={handleUpdateMeta}
-            onDeleteMeta={deleteMeta}
-          />
-        );
-      case 'ingredientes':
-        return (
-          <Ingredientes
-            data={data}
-            onAddIngrediente={addIngrediente}
-            onUpdateIngrediente={updateIngrediente}
-            onDeleteIngrediente={deleteIngrediente}
-          />
-        );
-      case 'fichatecnica':
-        return (
-          <FichaTecnicaSection
-            data={data}
-          />
-        );
-      case 'producao':
-        return (
-          <ProducaoSection
-            data={data}
-            onAddProducao={handleAddProducao}
-            onDeleteProducao={deleteProducao}
-          />
-        );
-      case 'precificacao':
-        return (
-          <Precificacao
-            data={data}
-            onUpdateFicha={updateFichaTecnica}
-          />
-        );
-      case 'relatorios':
-        return <Relatorios data={data} />;
-      case 'configuracoes':
-        return (
-          <ConfiguracoesSection
-            data={data}
-          />
-        );
-      default:
-        return <Dashboard data={data} />;
+    console.log('Renderizando módulo:', currentModule);
+    
+    try {
+      switch (currentModule) {
+        case 'dashboard':
+          return (
+            <ErrorBoundary key="dashboard">
+              <Dashboard data={data} />
+            </ErrorBoundary>
+          );
+        case 'caixa':
+          return (
+            <ErrorBoundary key="caixa">
+              <CaixaDiario
+                data={data}
+                onAddTransacao={handleAddTransacao}
+                onDeleteTransacao={deleteTransacao}
+              />
+            </ErrorBoundary>
+          );
+        case 'contas':
+          return (
+            <ErrorBoundary key="contas">
+              <ContasPagar
+                data={data}
+                onAddConta={addContaPagar}
+                onUpdateConta={updateContaPagar}
+                onDeleteConta={deleteContaPagar}
+              />
+            </ErrorBoundary>
+          );
+        case 'resultado':
+          return (
+            <ErrorBoundary key="resultado">
+              <ResultadoMensal data={data} />
+            </ErrorBoundary>
+          );
+        case 'metas':
+          return (
+            <ErrorBoundary key="metas">
+              <Metas
+                data={data}
+                onAddMeta={handleAddMeta}
+                onUpdateMeta={handleUpdateMeta}
+                onDeleteMeta={deleteMeta}
+              />
+            </ErrorBoundary>
+          );
+        case 'ingredientes':
+          return (
+            <ErrorBoundary key="ingredientes">
+              <Ingredientes
+                data={data}
+                onAddIngrediente={addIngrediente}
+                onUpdateIngrediente={updateIngrediente}
+                onDeleteIngrediente={deleteIngrediente}
+              />
+            </ErrorBoundary>
+          );
+        case 'fichatecnica':
+          return (
+            <ErrorBoundary key="fichatecnica">
+              <FichaTecnicaSection
+                data={data}
+              />
+            </ErrorBoundary>
+          );
+        case 'producao':
+          return (
+            <ErrorBoundary key="producao">
+              <ProducaoSection
+                data={data}
+                onAddProducao={handleAddProducao}
+                onDeleteProducao={deleteProducao}
+              />
+            </ErrorBoundary>
+          );
+        case 'precificacao':
+          return (
+            <ErrorBoundary key="precificacao">
+              <Precificacao
+                data={data}
+                onUpdateFicha={updateFichaTecnica}
+              />
+            </ErrorBoundary>
+          );
+        case 'relatorios':
+          return (
+            <ErrorBoundary key="relatorios">
+              <Relatorios data={data} />
+            </ErrorBoundary>
+          );
+        case 'configuracoes':
+          return (
+            <ErrorBoundary key="configuracoes">
+              <ConfiguracoesSection
+                data={data}
+              />
+            </ErrorBoundary>
+          );
+        default:
+          return (
+            <ErrorBoundary key="dashboard-default">
+              <Dashboard data={data} />
+            </ErrorBoundary>
+          );
+      }
+    } catch (error) {
+      console.error('Erro no renderModule:', error);
+      return (
+        <div className="p-8 text-center">
+          <h3 className="text-xl font-bold text-red-600 mb-2">Erro ao carregar módulo</h3>
+          <pre className="text-left bg-gray-100 p-4 rounded overflow-auto">
+            {error instanceof Error ? error.message : String(error)}
+          </pre>
+        </div>
+      );
     }
   };
 
@@ -227,7 +321,7 @@ function MainApp() {
   );
 }
 
-// App principal com rotas
+// ========== APP PRINCIPAL ==========
 function App() {
   return (
     <ThemeProvider>
