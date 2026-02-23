@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Percent, DollarSign, Tag, FolderOpen, Plus, Trash2, TrendingUp, PieChart, Download, Store, Image, Edit2, Save, X } from 'lucide-react';
+import { Percent, DollarSign, Tag, FolderOpen, Plus, Trash2, TrendingUp, PieChart, Download, Store, Image, Edit2, Save, X, Check } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,10 +52,13 @@ export function ConfiguracoesSection() {
 
   // Estados para taxas
   const [taxas, setTaxas] = useState(data?.configuracoes?.taxas || { pix: 0, debito: 1.5, credito: 3.5 });
+  const [taxasEditadas, setTaxasEditadas] = useState(data?.configuracoes?.taxas || { pix: 0, debito: 1.5, credito: 3.5 });
 
   // Estados para margens
   const [cmvPercentual, setCmvPercentual] = useState(data?.configuracoes?.cmvPercentualPadrao?.toString() || '30');
   const [margemLucro, setMargemLucro] = useState(data?.configuracoes?.margemLucroPadrao?.toString() || '60');
+  const [cmvPercentualEditado, setCmvPercentualEditado] = useState(data?.configuracoes?.cmvPercentualPadrao?.toString() || '30');
+  const [margemLucroEditado, setMargemLucroEditado] = useState(data?.configuracoes?.margemLucroPadrao?.toString() || '60');
 
   // Estados para configurações gerais
   const [nomeEstabelecimento, setNomeEstabelecimento] = useState(data?.configuracoes?.nomeEstabelecimento || '');
@@ -366,55 +369,68 @@ export function ConfiguracoesSection() {
   };
 
   // ========== TAXAS ==========
-  const handleTaxaChange = async (campo: 'pix' | 'debito' | 'credito', valor: string) => {
-    const novasTaxas = { ...taxas, [campo]: parseFloat(valor) || 0 };
-    setTaxas(novasTaxas);
-    
-    if (user) {
+  const handleTaxaChange = (campo: 'pix' | 'debito' | 'credito', valor: string) => {
+    const novasTaxas = { ...taxasEditadas, [campo]: parseFloat(valor) || 0 };
+    setTaxasEditadas(novasTaxas);
+  };
+
+  const handleSalvarTaxas = async () => {
+    if (!user) return;
+
+    try {
       await supabase
         .from('configuracoes')
         .upsert({
           user_id: user.id,
-          taxas: novasTaxas,
+          taxas: taxasEditadas,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' });
       
-      await updateConfiguracoes({ taxas: novasTaxas });
+      await updateConfiguracoes({ taxas: taxasEditadas });
+      setTaxas(taxasEditadas);
+      toast.success('Taxas salvas com sucesso!');
+    } catch (error) {
+      console.error('Erro ao salvar taxas:', error);
+      toast.error('Erro ao salvar taxas');
     }
   };
 
   // ========== MARGENS ==========
-  const handleCmvChange = async (valor: string) => {
-    setCmvPercentual(valor);
-    const numValor = parseFloat(valor) || 30;
-    
-    if (user) {
-      await supabase
-        .from('configuracoes')
-        .upsert({
-          user_id: user.id,
-          cmv_percentual_padrao: numValor,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'user_id' });
-      
-      await updateConfiguracoes({ cmvPercentualPadrao: numValor });
-    }
+  const handleCmvChange = (valor: string) => {
+    setCmvPercentualEditado(valor);
   };
 
-  const handleMargemChange = async (valor: string) => {
-    setMargemLucro(valor);
-    const numValor = parseFloat(valor) || 60;
-    
-    if (user) {
+  const handleMargemChange = (valor: string) => {
+    setMargemLucroEditado(valor);
+  };
+
+  const handleSalvarMargens = async () => {
+    if (!user) return;
+
+    try {
+      const numCmv = parseFloat(cmvPercentualEditado) || 30;
+      const numMargem = parseFloat(margemLucroEditado) || 60;
+
       await supabase
         .from('configuracoes')
         .upsert({
           user_id: user.id,
-          margem_lucro_padrao: numValor,
+          cmv_percentual_padrao: numCmv,
+          margem_lucro_padrao: numMargem,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' });
       
-      await updateConfiguracoes({ margemLucroPadrao: numValor });
+      await updateConfiguracoes({ 
+        cmvPercentualPadrao: numCmv,
+        margemLucroPadrao: numMargem 
+      });
+      
+      setCmvPercentual(cmvPercentualEditado);
+      setMargemLucro(margemLucroEditado);
+      toast.success('Margens salvas com sucesso!');
+    } catch (error) {
+      console.error('Erro ao salvar margens:', error);
+      toast.error('Erro ao salvar margens');
     }
   };
 
@@ -761,7 +777,7 @@ export function ConfiguracoesSection() {
                 <Input
                   type="number"
                   step="0.01"
-                  value={taxas.pix}
+                  value={taxasEditadas.pix}
                   onChange={(e) => handleTaxaChange('pix', e.target.value)}
                 />
               </div>
@@ -770,7 +786,7 @@ export function ConfiguracoesSection() {
                 <Input
                   type="number"
                   step="0.01"
-                  value={taxas.debito}
+                  value={taxasEditadas.debito}
                   onChange={(e) => handleTaxaChange('debito', e.target.value)}
                 />
               </div>
@@ -779,9 +795,19 @@ export function ConfiguracoesSection() {
                 <Input
                   type="number"
                   step="0.01"
-                  value={taxas.credito}
+                  value={taxasEditadas.credito}
                   onChange={(e) => handleTaxaChange('credito', e.target.value)}
                 />
+              </div>
+              <div className="pt-4">
+                <Button 
+                  onClick={handleSalvarTaxas}
+                  className="w-full bg-gradient-to-r from-pink-500 to-rose-500"
+                  disabled={JSON.stringify(taxas) === JSON.stringify(taxasEditadas)}
+                >
+                  <Check className="w-4 h-4 mr-2" />
+                  Salvar Taxas
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -959,7 +985,7 @@ export function ConfiguracoesSection() {
                 <Input
                   type="number"
                   step="0.1"
-                  value={cmvPercentual}
+                  value={cmvPercentualEditado}
                   onChange={(e) => handleCmvChange(e.target.value)}
                 />
               </div>
@@ -968,9 +994,19 @@ export function ConfiguracoesSection() {
                 <Input
                   type="number"
                   step="0.1"
-                  value={margemLucro}
+                  value={margemLucroEditado}
                   onChange={(e) => handleMargemChange(e.target.value)}
                 />
+              </div>
+              <div className="pt-4">
+                <Button 
+                  onClick={handleSalvarMargens}
+                  className="w-full bg-gradient-to-r from-pink-500 to-rose-500"
+                  disabled={cmvPercentual === cmvPercentualEditado && margemLucro === margemLucroEditado}
+                >
+                  <Check className="w-4 h-4 mr-2" />
+                  Salvar Margens
+                </Button>
               </div>
             </CardContent>
           </Card>
