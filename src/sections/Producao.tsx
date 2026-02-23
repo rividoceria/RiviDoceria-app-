@@ -9,36 +9,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { formatCurrency, formatNumber } from '@/lib/format';
-import type { SistemaData, Producao } from '@/types';
+import type { Producao } from '@/types';
 import { useCalculations } from '@/hooks/useCalculations';
 import { format, differenceInDays } from 'date-fns';
+import { useStorage } from '@/hooks/useStorage';
+import { toast } from 'sonner';
 
-interface ProducaoProps {
-  data: SistemaData;
-  onAddProducao: (producao: Omit<Producao, 'id' | 'createdAt'>) => void;
-  onDeleteProducao: (id: string) => void;
-}
-
-// Função para calcular status de validade
-function calcularStatusValidade(dataValidade?: string): { status: 'valido' | 'proximo' | 'vencido'; diasRestantes: number } {
-  if (!dataValidade) return { status: 'valido', diasRestantes: 999 };
+export function ProducaoSection() {
+  const { data, addProducao, deleteProducao } = useStorage();
   
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  const validade = new Date(dataValidade);
-  validade.setHours(0, 0, 0, 0);
-  
-  const diasRestantes = differenceInDays(validade, hoje);
-  
-  if (diasRestantes < 0) {
-    return { status: 'vencido', diasRestantes };
-  } else if (diasRestantes <= 2) {
-    return { status: 'proximo', diasRestantes };
-  }
-  return { status: 'valido', diasRestantes };
-}
-
-export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: ProducaoProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'registro' | 'compras'>('registro');
   
@@ -49,7 +28,6 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
   const [dataValidade, setDataValidade] = useState('');
   const [observacao, setObservacao] = useState('');
 
-  // Garantir que os arrays existam com proteção máxima
   const ingredientes = useMemo(() => data?.ingredientes || [], [data?.ingredientes]);
   const fichasTecnicas = useMemo(() => data?.fichasTecnicas || [], [data?.fichasTecnicas]);
   const producoes = useMemo(() => data?.producoes || [], [data?.producoes]);
@@ -64,40 +42,30 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
       .slice(0, 50);
   }, [producoes]);
 
-  // CORREÇÃO RADICAL: Calcular data de validade manualmente sem depender de bibliotecas
   const sugestaoValidade = useMemo(() => {
     if (!fichaTecnicaId || !dataProducao) return '';
     
     const ficha = fichasTecnicas.find(f => f?.id === fichaTecnicaId);
     if (!ficha?.validadeDias) return '';
     
-    // Extrair ano, mês, dia da string dataProducao (formato yyyy-MM-dd)
     const [ano, mes, dia] = dataProducao.split('-').map(Number);
-    
-    // Criar data UTC para evitar problemas de fuso
     const data = new Date(Date.UTC(ano, mes - 1, dia));
-    
-    // Adicionar os dias de validade
     data.setUTCDate(data.getUTCDate() + ficha.validadeDias);
     
-    // Formatar de volta para yyyy-MM-dd
     const anoResult = data.getUTCFullYear();
     const mesResult = String(data.getUTCMonth() + 1).padStart(2, '0');
     const diaResult = String(data.getUTCDate()).padStart(2, '0');
     
-    const resultado = `${anoResult}-${mesResult}-${diaResult}`;
-    
-    return resultado;
+    return `${anoResult}-${mesResult}-${diaResult}`;
   }, [fichaTecnicaId, dataProducao, fichasTecnicas]);
 
-  // Usar sugestão
   const aplicarSugestaoValidade = () => {
     if (sugestaoValidade) {
       setDataValidade(sugestaoValidade);
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!fichaTecnicaId || !quantidade || !dataValidade) return;
     
     const ficha = fichasTecnicas.find(f => f?.id === fichaTecnicaId);
@@ -105,7 +73,7 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
     
     const custoTotal = (ficha.custoUnidade || 0) * parseInt(quantidade);
     
-    onAddProducao({
+    await addProducao({
       fichaTecnicaId,
       quantidadeProduzida: parseInt(quantidade),
       dataProducao: dataProducao,
@@ -114,12 +82,15 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
       observacao,
     });
     
-    // Reset form
     setFichaTecnicaId('');
     setQuantidade('');
     setDataValidade('');
     setObservacao('');
     setIsDialogOpen(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    await deleteProducao(id);
   };
 
   const produtosFinais = useMemo(() => 
@@ -128,6 +99,24 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
   );
 
   const temProdutos = produtosFinais.length > 0;
+
+  function calcularStatusValidade(dataValidade?: string): { status: 'valido' | 'proximo' | 'vencido'; diasRestantes: number } {
+    if (!dataValidade) return { status: 'valido', diasRestantes: 999 };
+    
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const validade = new Date(dataValidade);
+    validade.setHours(0, 0, 0, 0);
+    
+    const diasRestantes = differenceInDays(validade, hoje);
+    
+    if (diasRestantes < 0) {
+      return { status: 'vencido', diasRestantes };
+    } else if (diasRestantes <= 2) {
+      return { status: 'proximo', diasRestantes };
+    }
+    return { status: 'valido', diasRestantes };
+  }
 
   return (
     <div className="space-y-6">
@@ -205,7 +194,6 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
                   </div>
                 </div>
                 
-                {/* Data de Validade */}
                 <div>
                   <Label>Data de Validade *</Label>
                   <Input
@@ -216,7 +204,6 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
                   />
                 </div>
                 
-                {/* Sugestão - calculada manualmente sem fuso horário */}
                 {fichaTecnicaId && sugestaoValidade && !dataValidade && (
                   <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
                     <Calendar className="w-4 h-4 text-blue-600" />
@@ -234,7 +221,6 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
                   </div>
                 )}
 
-                {/* Data selecionada */}
                 {dataValidade && (
                   <div className="p-3 bg-amber-50 rounded-lg flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-amber-600" />
@@ -356,7 +342,7 @@ export function ProducaoSection({ data, onAddProducao, onDeleteProducao }: Produ
                             variant="ghost"
                             size="icon"
                             className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => onDeleteProducao(producao.id)}
+                            onClick={() => handleDelete(producao.id)}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
