@@ -58,6 +58,18 @@ const defaultData: SistemaData = {
   configuracoes: defaultConfig,
 };
 
+// ========== UNIDADES DE MEDIDA PERMITIDAS ==========
+// Deve corresponder exatamente às definidas no banco de dados
+const UNIDADES_PERMITIDAS = [
+  'kg',  // Quilograma
+  'g',   // Grama
+  'L',   // Litro
+  'ml',  // Mililitro
+  'un',  // Unidade
+  'cm',  // Centímetro
+  'm'    // Metro
+];
+
 export function useStorage() {
   const { user } = useAuth();
   const [data, setData] = useState<SistemaData>(defaultData);
@@ -122,7 +134,7 @@ export function useStorage() {
 
         // Montar os dados no formato esperado pelo app
         const loadedData: SistemaData = {
-          // CORREÇÃO: Ingredientes - calcular precoEmbalagem a partir de custo_unidade e quantidade_embalagem
+          // Ingredientes - calcular precoEmbalagem
           ingredientes: (ingredientes.data || []).map((item: any) => {
             const precoEmbalagemCalculado = item.custo_unidade * item.quantidade_embalagem;
             return {
@@ -130,7 +142,7 @@ export function useStorage() {
               nome: item.nome,
               quantidadeEmbalagem: item.quantidade_embalagem,
               unidade: item.unidade,
-              precoEmbalagem: precoEmbalagemCalculado, // ← CALCULADO
+              precoEmbalagem: precoEmbalagemCalculado,
               custoUnidade: item.custo_unidade,
               estoqueAtual: item.quantidade_estoque,
               estoqueMinimo: item.estoque_minimo,
@@ -188,7 +200,7 @@ export function useStorage() {
     loadData();
   }, [user]);
 
-  // ========== INGREDIENTES (CORRIGIDO - SEM PRECO_EMBALAGEM) ==========
+  // ========== INGREDIENTES (CORRIGIDO COM TODAS AS UNIDADES) ==========
   const addIngrediente = useCallback(async (ingrediente: Omit<Ingrediente, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!user) {
       toast.error('Usuário não logado');
@@ -196,6 +208,18 @@ export function useStorage() {
     }
 
     console.log('📝 Adicionando ingrediente:', ingrediente);
+
+    // Validar unidade (agora inclui cm e m)
+    if (!UNIDADES_PERMITIDAS.includes(ingrediente.unidade)) {
+      toast.error(`Unidade inválida: ${ingrediente.unidade}. Use: kg, g, L, ml, un, cm, m`);
+      return;
+    }
+
+    // Validar quantidade
+    if (ingrediente.quantidadeEmbalagem <= 0) {
+      toast.error('Quantidade da embalagem deve ser maior que zero');
+      return;
+    }
 
     // Calcular custo_unidade a partir do precoEmbalagem e quantidadeEmbalagem
     const custoUnidadeCalculado = ingrediente.precoEmbalagem / ingrediente.quantidadeEmbalagem;
@@ -205,7 +229,7 @@ export function useStorage() {
       nome: ingrediente.nome,
       tipo: ingrediente.tipo,
       unidade: ingrediente.unidade,
-      custo_unidade: custoUnidadeCalculado, // ← APENAS custo_unidade (preco_embalagem NÃO EXISTE)
+      custo_unidade: custoUnidadeCalculado,
       quantidade_embalagem: ingrediente.quantidadeEmbalagem,
       estoque_minimo: ingrediente.estoqueMinimo,
       quantidade_estoque: ingrediente.estoqueAtual,
@@ -222,7 +246,12 @@ export function useStorage() {
 
     if (error) {
       console.error('❌ Erro no Supabase:', error);
-      toast.error('Erro ao adicionar ingrediente: ' + error.message);
+      
+      if (error.message.includes('ingredientes_unidade_check')) {
+        toast.error('Unidade inválida. Use: kg, g, L, ml, un, cm, m');
+      } else {
+        toast.error('Erro ao adicionar ingrediente: ' + error.message);
+      }
       return;
     }
 
@@ -236,7 +265,7 @@ export function useStorage() {
       nome: result.nome,
       quantidadeEmbalagem: result.quantidade_embalagem,
       unidade: result.unidade,
-      precoEmbalagem: precoEmbalagemCalculado, // ← CALCULADO
+      precoEmbalagem: precoEmbalagemCalculado,
       custoUnidade: result.custo_unidade,
       estoqueAtual: result.quantidade_estoque,
       estoqueMinimo: result.estoque_minimo,
@@ -244,8 +273,6 @@ export function useStorage() {
       createdAt: result.created_at,
       updatedAt: result.created_at,
     };
-
-    console.log('🔄 Atualizando estado local com:', novoIngrediente);
 
     setData(prev => ({
       ...prev,
@@ -261,6 +288,12 @@ export function useStorage() {
 
     console.log('📝 Atualizando ingrediente:', id, updates);
 
+    // Validar unidade se estiver sendo atualizada
+    if (updates.unidade && !UNIDADES_PERMITIDAS.includes(updates.unidade)) {
+      toast.error(`Unidade inválida: ${updates.unidade}. Use: kg, g, L, ml, un, cm, m`);
+      return;
+    }
+
     const dbUpdates: any = {};
     if (updates.nome !== undefined) dbUpdates.nome = updates.nome;
     if (updates.tipo !== undefined) dbUpdates.tipo = updates.tipo;
@@ -271,11 +304,12 @@ export function useStorage() {
     
     // Lógica para atualizar custo_unidade baseado em precoEmbalagem
     if (updates.precoEmbalagem !== undefined) {
-      // Precisamos saber a quantidade atual
       const ingredienteAtual = data.ingredientes.find(i => i.id === id);
       if (ingredienteAtual) {
         const quantidade = updates.quantidadeEmbalagem ?? ingredienteAtual.quantidadeEmbalagem;
-        dbUpdates.custo_unidade = updates.precoEmbalagem / quantidade;
+        if (quantidade > 0) {
+          dbUpdates.custo_unidade = updates.precoEmbalagem / quantidade;
+        }
       }
     } else if (updates.custoUnidade !== undefined) {
       dbUpdates.custo_unidade = updates.custoUnidade;
@@ -291,11 +325,15 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao atualizar ingrediente:', error);
-      toast.error('Erro ao atualizar ingrediente');
+      
+      if (error.message.includes('ingredientes_unidade_check')) {
+        toast.error('Unidade inválida. Use: kg, g, L, ml, un, cm, m');
+      } else {
+        toast.error('Erro ao atualizar ingrediente: ' + error.message);
+      }
       return;
     }
 
-    // Calcular precoEmbalagem a partir do resultado
     const precoEmbalagemCalculado = result.custo_unidade * result.quantidade_embalagem;
 
     const ingredienteAtualizado: Ingrediente = {
@@ -303,7 +341,7 @@ export function useStorage() {
       nome: result.nome,
       quantidadeEmbalagem: result.quantidade_embalagem,
       unidade: result.unidade,
-      precoEmbalagem: precoEmbalagemCalculado, // ← CALCULADO
+      precoEmbalagem: precoEmbalagemCalculado,
       custoUnidade: result.custo_unidade,
       estoqueAtual: result.quantidade_estoque,
       estoqueMinimo: result.estoque_minimo,
