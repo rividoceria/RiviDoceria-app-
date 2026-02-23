@@ -63,7 +63,7 @@ export function useStorage() {
   const [data, setData] = useState<SistemaData>(defaultData);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // ========== CARREGAR DADOS DO SUPABASE (CORRIGIDO) ==========
+  // ========== CARREGAR DADOS DO SUPABASE ==========
   useEffect(() => {
     async function loadData() {
       if (!user) {
@@ -72,7 +72,6 @@ export function useStorage() {
       }
 
       try {
-        // Carregar todas as tabelas em paralelo
         const [
           categoriasProduto,
           categoriasConta,
@@ -99,7 +98,6 @@ export function useStorage() {
           supabase.from('configuracoes').select('*').eq('user_id', user.id).maybeSingle()
         ]);
 
-        // Carregar itens das fichas técnicas
         let itensFicha: any[] = [];
         if (fichasTecnicas.data && fichasTecnicas.data.length > 0) {
           const fichaIds = fichasTecnicas.data.map(f => f.id);
@@ -110,7 +108,6 @@ export function useStorage() {
           itensFicha = itensResult.data || [];
         }
 
-        // Carregar receitas base
         let receitasBase: any[] = [];
         if (fichasTecnicas.data && fichasTecnicas.data.length > 0) {
           const fichaIds = fichasTecnicas.data.map(f => f.id);
@@ -121,19 +118,17 @@ export function useStorage() {
           receitasBase = receitasResult.data || [];
         }
 
-        // LOG PARA DEBUG
-        console.log('📊 [LOAD] Categorias do Supabase:', categoriasProduto.data);
-        console.log('📊 [LOAD] Primeira categoria:', categoriasProduto.data?.[0]);
+        console.log('📊 [LOAD] Ingredientes do Supabase:', ingredientes.data);
 
-        // Montar os dados no formato esperado pelo app (CORRIGIDO)
+        // Montar os dados no formato esperado pelo app
         const loadedData: SistemaData = {
-          // Ingredientes com conversão correta
+          // CORREÇÃO: Ingredientes com conversão explícita
           ingredientes: (ingredientes.data || []).map((item: any) => ({
             id: item.id,
             nome: item.nome,
             quantidadeEmbalagem: item.quantidade_embalagem,
             unidade: item.unidade,
-            precoEmbalagem: 0,
+            precoEmbalagem: item.preco_embalagem, // ← CORREÇÃO AQUI
             custoUnidade: item.custo_unidade,
             estoqueAtual: item.quantidade_estoque,
             estoqueMinimo: item.estoque_minimo,
@@ -142,7 +137,6 @@ export function useStorage() {
             updatedAt: item.created_at,
           })),
           
-          // Fichas técnicas
           fichasTecnicas: (fichasTecnicas.data || []).map((ficha: any) => ({
             ...ficha,
             itens: itensFicha.filter(item => item.ficha_id === ficha.id && item.tipo === 'ingrediente'),
@@ -152,20 +146,18 @@ export function useStorage() {
               .map(r => r.receita_base_id)
           })),
           
-          // CORREÇÃO CRÍTICA: Categorias de produto com conversão explícita
           categoriasProduto: (categoriasProduto.data || []).map((item: any) => ({
             id: item.id,
             nome: item.nome,
-            margemPadrao: item.margem_padrao, // ← GARANTINDO A CONVERSÃO
+            margemPadrao: item.margem_padrao,
             cor: item.cor,
           })),
           
-          // CORREÇÃO CRÍTICA: Categorias de conta com conversão explícita
           categoriasConta: (categoriasConta.data || []).map((item: any) => ({
             id: item.id,
             nome: item.nome,
             tipo: item.tipo,
-            limiteGasto: item.limite_gasto, // ← GARANTINDO A CONVERSÃO
+            limiteGasto: item.limite_gasto,
             cor: item.cor,
           })),
           
@@ -173,8 +165,6 @@ export function useStorage() {
           transacoes: transacoes.data || [],
           contasPagar: contasPagar.data || [],
           metas: metas.data || [],
-          
-          // Configurações com custos
           configuracoes: configuracoes.data ? {
             ...defaultConfig,
             ...configuracoes.data,
@@ -183,7 +173,7 @@ export function useStorage() {
           } : defaultConfig,
         };
 
-        console.log('📊 [LOAD] Dados carregados - categorias:', loadedData.categoriasProduto);
+        console.log('📊 [LOAD] Ingredientes carregados:', loadedData.ingredientes);
         setData(loadedData);
       } catch (error) {
         console.error('Erro ao carregar dados do Supabase:', error);
@@ -195,21 +185,29 @@ export function useStorage() {
     loadData();
   }, [user]);
 
-  // ========== INGREDIENTES ==========
+  // ========== INGREDIENTES (CORRIGIDO) ==========
   const addIngrediente = useCallback(async (ingrediente: Omit<Ingrediente, 'id' | 'createdAt' | 'updatedAt'>) => {
-    if (!user) return;
+    if (!user) {
+      toast.error('Usuário não logado');
+      return;
+    }
+
+    console.log('📝 Adicionando ingrediente:', ingrediente);
 
     const newIngrediente = {
       user_id: user.id,
       nome: ingrediente.nome,
       tipo: ingrediente.tipo,
       unidade: ingrediente.unidade,
+      preco_embalagem: ingrediente.precoEmbalagem, // ← CORREÇÃO
       custo_unidade: ingrediente.custoUnidade,
       quantidade_embalagem: ingrediente.quantidadeEmbalagem,
       estoque_minimo: ingrediente.estoqueMinimo,
       quantidade_estoque: ingrediente.estoqueAtual,
       created_at: new Date().toISOString(),
     };
+
+    console.log('📤 Enviando para Supabase:', newIngrediente);
 
     const { data: result, error } = await supabase
       .from('ingredientes')
@@ -218,17 +216,19 @@ export function useStorage() {
       .single();
 
     if (error) {
-      console.error('Erro ao adicionar ingrediente:', error);
-      toast.error('Erro ao adicionar ingrediente');
+      console.error('❌ Erro no Supabase:', error);
+      toast.error('Erro ao adicionar ingrediente: ' + error.message);
       return;
     }
+
+    console.log('✅ Ingrediente adicionado no Supabase:', result);
 
     const novoIngrediente: Ingrediente = {
       id: result.id,
       nome: result.nome,
       quantidadeEmbalagem: result.quantidade_embalagem,
       unidade: result.unidade,
-      precoEmbalagem: 0,
+      precoEmbalagem: result.preco_embalagem, // ← CORREÇÃO
       custoUnidade: result.custo_unidade,
       estoqueAtual: result.quantidade_estoque,
       estoqueMinimo: result.estoque_minimo,
@@ -237,21 +237,27 @@ export function useStorage() {
       updatedAt: result.created_at,
     };
 
+    console.log('🔄 Atualizando estado local com:', novoIngrediente);
+
     setData(prev => ({
       ...prev,
       ingredientes: [...prev.ingredientes, novoIngrediente],
     }));
 
+    toast.success('Ingrediente adicionado com sucesso!');
     return novoIngrediente;
   }, [user]);
 
   const updateIngrediente = useCallback(async (id: string, updates: Partial<Ingrediente>) => {
     if (!user) return;
 
+    console.log('📝 Atualizando ingrediente:', id, updates);
+
     const dbUpdates: any = {};
     if (updates.nome !== undefined) dbUpdates.nome = updates.nome;
     if (updates.tipo !== undefined) dbUpdates.tipo = updates.tipo;
     if (updates.unidade !== undefined) dbUpdates.unidade = updates.unidade;
+    if (updates.precoEmbalagem !== undefined) dbUpdates.preco_embalagem = updates.precoEmbalagem; // ← CORREÇÃO
     if (updates.custoUnidade !== undefined) dbUpdates.custo_unidade = updates.custoUnidade;
     if (updates.quantidadeEmbalagem !== undefined) dbUpdates.quantidade_embalagem = updates.quantidadeEmbalagem;
     if (updates.estoqueMinimo !== undefined) dbUpdates.estoque_minimo = updates.estoqueMinimo;
@@ -276,7 +282,7 @@ export function useStorage() {
       nome: result.nome,
       quantidadeEmbalagem: result.quantidade_embalagem,
       unidade: result.unidade,
-      precoEmbalagem: 0,
+      precoEmbalagem: result.preco_embalagem, // ← CORREÇÃO
       custoUnidade: result.custo_unidade,
       estoqueAtual: result.quantidade_estoque,
       estoqueMinimo: result.estoque_minimo,
@@ -289,6 +295,8 @@ export function useStorage() {
       ...prev,
       ingredientes: prev.ingredientes.map(i => i.id === id ? ingredienteAtualizado : i),
     }));
+
+    toast.success('Ingrediente atualizado!');
   }, [user]);
 
   const deleteIngrediente = useCallback(async (id: string) => {
@@ -310,6 +318,8 @@ export function useStorage() {
       ...prev,
       ingredientes: prev.ingredientes.filter(i => i.id !== id),
     }));
+
+    toast.success('Ingrediente deletado!');
   }, [user]);
 
   // ========== FICHAS TÉCNICAS ==========
@@ -746,8 +756,6 @@ export function useStorage() {
       return;
     }
 
-    console.log('📝 Adicionando categoria de conta:', categoria);
-
     const { data: result, error } = await supabase
       .from('categorias_contas')
       .insert([{
@@ -761,14 +769,11 @@ export function useStorage() {
       .single();
 
     if (error) {
-      console.error('❌ Erro no Supabase:', error);
+      console.error('Erro no Supabase:', error);
       toast.error('Erro ao adicionar categoria: ' + error.message);
       return;
     }
 
-    console.log('✅ Categoria adicionada no Supabase:', result);
-
-    // Converter para o formato do app
     const novaCategoria: CategoriaConta = {
       id: result.id,
       nome: result.nome,
@@ -776,8 +781,6 @@ export function useStorage() {
       limiteGasto: result.limite_gasto,
       cor: result.cor,
     };
-
-    console.log('🔄 Atualizando estado local com:', novaCategoria);
 
     setData(prev => ({
       ...prev,
@@ -857,8 +860,6 @@ export function useStorage() {
       return;
     }
 
-    console.log('📝 Adicionando categoria de produto:', categoria);
-
     const { data: result, error } = await supabase
       .from('categorias_produtos')
       .insert([{
@@ -871,22 +872,17 @@ export function useStorage() {
       .single();
 
     if (error) {
-      console.error('❌ Erro no Supabase:', error);
+      console.error('Erro no Supabase:', error);
       toast.error('Erro ao adicionar categoria: ' + error.message);
       return;
     }
 
-    console.log('✅ Categoria adicionada no Supabase:', result);
-
-    // Converter para o formato do app
     const novaCategoria: CategoriaProduto = {
       id: result.id,
       nome: result.nome,
       margemPadrao: result.margem_padrao,
       cor: result.cor,
     };
-
-    console.log('🔄 Atualizando estado local com:', novaCategoria);
 
     setData(prev => ({
       ...prev,
