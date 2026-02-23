@@ -8,17 +8,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ProgressBar } from '@/components/ui-custom/ProgressBar';
 import { formatCurrency, formatDate } from '@/lib/format';
-import type { SistemaData, Meta, TipoMeta } from '@/types';
+import type { Meta, TipoMeta } from '@/types';
 import { differenceInMonths } from 'date-fns';
+import { useStorage } from '@/hooks/useStorage';
+import { toast } from 'sonner';
 
-interface MetasProps {
-  data: SistemaData;
-  onAddMeta: (meta: Omit<Meta, 'id' | 'createdAt'>) => void;
-  onUpdateMeta: (id: string, updates: Partial<Meta>) => void;
-  onDeleteMeta: (id: string) => void;
-}
-
-export function Metas({ data, onAddMeta, onUpdateMeta, onDeleteMeta }: MetasProps) {
+export function Metas() {
+  const { data, addMeta, updateMeta, deleteMeta } = useStorage();
+  
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isAddValorOpen, setIsAddValorOpen] = useState(false);
   const [metaSelecionada, setMetaSelecionada] = useState<Meta | null>(null);
@@ -34,13 +31,13 @@ export function Metas({ data, onAddMeta, onUpdateMeta, onDeleteMeta }: MetasProp
   // Add valor form
   const [valorAdicionar, setValorAdicionar] = useState('');
 
-  const metasAtivas = data.metas.filter(m => m.ativa);
-  const metasConcluidas = data.metas.filter(m => !m.ativa);
+  const metasAtivas = (data?.metas || []).filter(m => m.ativa);
+  const metasConcluidas = (data?.metas || []).filter(m => !m.ativa);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!nome || !valorMeta || !dataInicio) return;
     
-    onAddMeta({
+    await addMeta({
       tipo,
       nome,
       valorMeta: parseFloat(valorMeta),
@@ -58,11 +55,11 @@ export function Metas({ data, onAddMeta, onUpdateMeta, onDeleteMeta }: MetasProp
     setIsDialogOpen(false);
   };
 
-  const handleAddValor = () => {
+  const handleAddValor = async () => {
     if (!metaSelecionada || !valorAdicionar) return;
     
     const novoValor = metaSelecionada.valorAcumulado + parseFloat(valorAdicionar);
-    onUpdateMeta(metaSelecionada.id, {
+    await updateMeta(metaSelecionada.id, {
       valorAcumulado: novoValor,
       ativa: novoValor < metaSelecionada.valorMeta,
     });
@@ -70,6 +67,10 @@ export function Metas({ data, onAddMeta, onUpdateMeta, onDeleteMeta }: MetasProp
     setValorAdicionar('');
     setIsAddValorOpen(false);
     setMetaSelecionada(null);
+  };
+
+  const handleDelete = async (id: string) => {
+    await deleteMeta(id);
   };
 
   const openAddValor = (meta: Meta) => {
@@ -165,7 +166,7 @@ export function Metas({ data, onAddMeta, onUpdateMeta, onDeleteMeta }: MetasProp
                 variant="ghost"
                 size="icon"
                 className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                onClick={() => onDeleteMeta(meta.id)}
+                onClick={() => handleDelete(meta.id)}
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
