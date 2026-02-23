@@ -59,16 +59,7 @@ const defaultData: SistemaData = {
 };
 
 // ========== UNIDADES DE MEDIDA PERMITIDAS ==========
-// Deve corresponder exatamente às definidas no banco de dados
-const UNIDADES_PERMITIDAS = [
-  'kg',  // Quilograma
-  'g',   // Grama
-  'L',   // Litro
-  'ml',  // Mililitro
-  'un',  // Unidade
-  'cm',  // Centímetro
-  'm'    // Metro
-];
+const UNIDADES_PERMITIDAS = ['kg', 'g', 'L', 'ml', 'un', 'cm', 'm'];
 
 export function useStorage() {
   const { user } = useAuth();
@@ -130,11 +121,9 @@ export function useStorage() {
           receitasBase = receitasResult.data || [];
         }
 
-        console.log('📊 [LOAD] Ingredientes do Supabase:', ingredientes.data);
-
         // Montar os dados no formato esperado pelo app
         const loadedData: SistemaData = {
-          // Ingredientes - calcular precoEmbalagem
+          // ========== INGREDIENTES ==========
           ingredientes: (ingredientes.data || []).map((item: any) => {
             const precoEmbalagemCalculado = item.custo_unidade * item.quantidade_embalagem;
             return {
@@ -152,15 +141,31 @@ export function useStorage() {
             };
           }),
           
+          // ========== FICHAS TÉCNICAS ==========
           fichasTecnicas: (fichasTecnicas.data || []).map((ficha: any) => ({
-            ...ficha,
+            id: ficha.id,
+            nome: ficha.nome,
+            tipo: ficha.tipo,
+            categoriaId: ficha.categoria_id,
+            descricao: ficha.descricao,
+            rendimentoQuantidade: ficha.rendimento_quantidade,
+            rendimentoUnidade: ficha.rendimento_unidade,
+            custoTotal: ficha.custo_total,
+            custoUnidade: ficha.custo_unidade,
+            precoVenda: ficha.preco_venda,
+            margemLucro: ficha.margem_lucro,
+            cmvPercentual: ficha.cmv_percentual,
+            validadeDias: ficha.validade_dias,
             itens: itensFicha.filter(item => item.ficha_id === ficha.id && item.tipo === 'ingrediente'),
             itensEmbalagem: itensFicha.filter(item => item.ficha_id === ficha.id && item.tipo === 'embalagem'),
             receitasBaseIds: receitasBase
               .filter(r => r.ficha_produto_id === ficha.id)
-              .map(r => r.receita_base_id)
+              .map(r => r.receita_base_id),
+            createdAt: ficha.created_at,
+            updatedAt: ficha.updated_at,
           })),
           
+          // ========== CATEGORIAS DE PRODUTO ==========
           categoriasProduto: (categoriasProduto.data || []).map((item: any) => ({
             id: item.id,
             nome: item.nome,
@@ -168,6 +173,7 @@ export function useStorage() {
             cor: item.cor,
           })),
           
+          // ========== CATEGORIAS DE CONTA ==========
           categoriasConta: (categoriasConta.data || []).map((item: any) => ({
             id: item.id,
             nome: item.nome,
@@ -180,6 +186,8 @@ export function useStorage() {
           transacoes: transacoes.data || [],
           contasPagar: contasPagar.data || [],
           metas: metas.data || [],
+          
+          // ========== CONFIGURAÇÕES ==========
           configuracoes: configuracoes.data ? {
             ...defaultConfig,
             ...configuracoes.data,
@@ -188,7 +196,6 @@ export function useStorage() {
           } : defaultConfig,
         };
 
-        console.log('📊 [LOAD] Ingredientes carregados:', loadedData.ingredientes);
         setData(loadedData);
       } catch (error) {
         console.error('Erro ao carregar dados do Supabase:', error);
@@ -200,28 +207,25 @@ export function useStorage() {
     loadData();
   }, [user]);
 
-  // ========== INGREDIENTES (CORRIGIDO COM TODAS AS UNIDADES) ==========
+  // ========== INGREDIENTES ==========
   const addIngrediente = useCallback(async (ingrediente: Omit<Ingrediente, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!user) {
       toast.error('Usuário não logado');
       return;
     }
 
-    console.log('📝 Adicionando ingrediente:', ingrediente);
-
-    // Validar unidade (agora inclui cm e m)
+    // Validar unidade
     if (!UNIDADES_PERMITIDAS.includes(ingrediente.unidade)) {
       toast.error(`Unidade inválida: ${ingrediente.unidade}. Use: kg, g, L, ml, un, cm, m`);
       return;
     }
 
-    // Validar quantidade
     if (ingrediente.quantidadeEmbalagem <= 0) {
       toast.error('Quantidade da embalagem deve ser maior que zero');
       return;
     }
 
-    // Calcular custo_unidade a partir do precoEmbalagem e quantidadeEmbalagem
+    // Calcular custo_unidade a partir do precoEmbalagem
     const custoUnidadeCalculado = ingrediente.precoEmbalagem / ingrediente.quantidadeEmbalagem;
 
     const newIngrediente = {
@@ -236,8 +240,6 @@ export function useStorage() {
       created_at: new Date().toISOString(),
     };
 
-    console.log('📤 Enviando para Supabase:', newIngrediente);
-
     const { data: result, error } = await supabase
       .from('ingredientes')
       .insert([newIngrediente])
@@ -245,19 +247,11 @@ export function useStorage() {
       .single();
 
     if (error) {
-      console.error('❌ Erro no Supabase:', error);
-      
-      if (error.message.includes('ingredientes_unidade_check')) {
-        toast.error('Unidade inválida. Use: kg, g, L, ml, un, cm, m');
-      } else {
-        toast.error('Erro ao adicionar ingrediente: ' + error.message);
-      }
+      console.error('Erro no Supabase:', error);
+      toast.error('Erro ao adicionar ingrediente: ' + error.message);
       return;
     }
 
-    console.log('✅ Ingrediente adicionado no Supabase:', result);
-
-    // Calcular precoEmbalagem a partir do resultado
     const precoEmbalagemCalculado = result.custo_unidade * result.quantidade_embalagem;
 
     const novoIngrediente: Ingrediente = {
@@ -286,9 +280,6 @@ export function useStorage() {
   const updateIngrediente = useCallback(async (id: string, updates: Partial<Ingrediente>) => {
     if (!user) return;
 
-    console.log('📝 Atualizando ingrediente:', id, updates);
-
-    // Validar unidade se estiver sendo atualizada
     if (updates.unidade && !UNIDADES_PERMITIDAS.includes(updates.unidade)) {
       toast.error(`Unidade inválida: ${updates.unidade}. Use: kg, g, L, ml, un, cm, m`);
       return;
@@ -302,7 +293,6 @@ export function useStorage() {
     if (updates.estoqueMinimo !== undefined) dbUpdates.estoque_minimo = updates.estoqueMinimo;
     if (updates.estoqueAtual !== undefined) dbUpdates.quantidade_estoque = updates.estoqueAtual;
     
-    // Lógica para atualizar custo_unidade baseado em precoEmbalagem
     if (updates.precoEmbalagem !== undefined) {
       const ingredienteAtual = data.ingredientes.find(i => i.id === id);
       if (ingredienteAtual) {
@@ -325,12 +315,7 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao atualizar ingrediente:', error);
-      
-      if (error.message.includes('ingredientes_unidade_check')) {
-        toast.error('Unidade inválida. Use: kg, g, L, ml, un, cm, m');
-      } else {
-        toast.error('Erro ao atualizar ingrediente: ' + error.message);
-      }
+      toast.error('Erro ao atualizar ingrediente: ' + error.message);
       return;
     }
 
@@ -383,12 +368,27 @@ export function useStorage() {
 
   // ========== FICHAS TÉCNICAS ==========
   const addFichaTecnica = useCallback(async (ficha: Omit<FichaTecnica, 'id' | 'createdAt' | 'updatedAt'>) => {
-    if (!user) return;
+    if (!user) {
+      toast.error('Usuário não logado');
+      return;
+    }
 
+    // 1. Inserir a ficha técnica
     const { data: novaFicha, error: fichaError } = await supabase
       .from('fichas_tecnicas')
       .insert([{
-        ...ficha,
+        nome: ficha.nome,
+        tipo: ficha.tipo,
+        categoria_id: ficha.categoriaId,
+        descricao: ficha.descricao,
+        rendimento_quantidade: ficha.rendimentoQuantidade,
+        rendimento_unidade: ficha.rendimentoUnidade,
+        custo_total: ficha.custoTotal,
+        custo_unidade: ficha.custoUnidade,
+        preco_venda: ficha.precoVenda,
+        margem_lucro: ficha.margemLucro,
+        cmv_percentual: ficha.cmvPercentual,
+        validade_dias: ficha.validadeDias,
         user_id: user.id,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -398,10 +398,11 @@ export function useStorage() {
 
     if (fichaError) {
       console.error('Erro ao adicionar ficha técnica:', fichaError);
-      toast.error('Erro ao adicionar ficha técnica');
+      toast.error('Erro ao adicionar ficha técnica: ' + fichaError.message);
       return;
     }
 
+    // 2. Inserir os itens
     const itens = [
       ...(ficha.itens || []).map(item => ({ ...item, tipo: 'ingrediente' })),
       ...(ficha.itensEmbalagem || []).map(item => ({ ...item, tipo: 'embalagem' }))
@@ -411,8 +412,12 @@ export function useStorage() {
       const { error: itensError } = await supabase
         .from('itens_ficha')
         .insert(itens.map(item => ({
-          ...item,
           ficha_id: novaFicha.id,
+          ingrediente_id: item.ingredienteId,
+          quantidade: item.quantidade,
+          unidade: item.unidade,
+          custo: item.custo,
+          tipo: item.tipo,
         })));
 
       if (itensError) {
@@ -420,6 +425,7 @@ export function useStorage() {
       }
     }
 
+    // 3. Inserir receitas base
     if (ficha.receitasBaseIds && ficha.receitasBaseIds.length > 0) {
       const { error: receitasError } = await supabase
         .from('receitas_base_ficha')
@@ -433,11 +439,26 @@ export function useStorage() {
       }
     }
 
+    // 4. Converter de volta
     const fichaCompleta: FichaTecnica = {
-      ...novaFicha,
+      id: novaFicha.id,
+      nome: novaFicha.nome,
+      tipo: novaFicha.tipo,
+      categoriaId: novaFicha.categoria_id,
+      descricao: novaFicha.descricao,
+      rendimentoQuantidade: novaFicha.rendimento_quantidade,
+      rendimentoUnidade: novaFicha.rendimento_unidade,
+      custoTotal: novaFicha.custo_total,
+      custoUnidade: novaFicha.custo_unidade,
+      precoVenda: novaFicha.preco_venda,
+      margemLucro: novaFicha.margem_lucro,
+      cmvPercentual: novaFicha.cmv_percentual,
+      validadeDias: novaFicha.validade_dias,
       itens: ficha.itens || [],
       itensEmbalagem: ficha.itensEmbalagem || [],
       receitasBaseIds: ficha.receitasBaseIds || [],
+      createdAt: novaFicha.created_at,
+      updatedAt: novaFicha.updated_at,
     };
 
     setData(prev => ({
@@ -445,15 +466,32 @@ export function useStorage() {
       fichasTecnicas: [...prev.fichasTecnicas, fichaCompleta],
     }));
 
+    toast.success('Ficha técnica adicionada com sucesso!');
     return fichaCompleta;
   }, [user]);
 
   const updateFichaTecnica = useCallback(async (id: string, updates: Partial<FichaTecnica>) => {
     if (!user) return;
 
+    // 1. Atualizar a ficha técnica
+    const dbUpdates: any = {};
+    if (updates.nome !== undefined) dbUpdates.nome = updates.nome;
+    if (updates.tipo !== undefined) dbUpdates.tipo = updates.tipo;
+    if (updates.categoriaId !== undefined) dbUpdates.categoria_id = updates.categoriaId;
+    if (updates.descricao !== undefined) dbUpdates.descricao = updates.descricao;
+    if (updates.rendimentoQuantidade !== undefined) dbUpdates.rendimento_quantidade = updates.rendimentoQuantidade;
+    if (updates.rendimentoUnidade !== undefined) dbUpdates.rendimento_unidade = updates.rendimentoUnidade;
+    if (updates.custoTotal !== undefined) dbUpdates.custo_total = updates.custoTotal;
+    if (updates.custoUnidade !== undefined) dbUpdates.custo_unidade = updates.custoUnidade;
+    if (updates.precoVenda !== undefined) dbUpdates.preco_venda = updates.precoVenda;
+    if (updates.margemLucro !== undefined) dbUpdates.margem_lucro = updates.margemLucro;
+    if (updates.cmvPercentual !== undefined) dbUpdates.cmv_percentual = updates.cmvPercentual;
+    if (updates.validadeDias !== undefined) dbUpdates.validade_dias = updates.validadeDias;
+    dbUpdates.updated_at = new Date().toISOString();
+
     const { data: fichaAtualizada, error: fichaError } = await supabase
       .from('fichas_tecnicas')
-      .update({ ...updates, updated_at: new Date().toISOString() })
+      .update(dbUpdates)
       .eq('id', id)
       .eq('user_id', user.id)
       .select()
@@ -461,10 +499,11 @@ export function useStorage() {
 
     if (fichaError) {
       console.error('Erro ao atualizar ficha técnica:', fichaError);
-      toast.error('Erro ao atualizar ficha técnica');
+      toast.error('Erro ao atualizar ficha técnica: ' + fichaError.message);
       return;
     }
 
+    // 2. Atualizar itens (deleta e reinsere)
     await supabase.from('itens_ficha').delete().eq('ficha_id', id);
     
     const itens = [
@@ -475,12 +514,17 @@ export function useStorage() {
     if (itens.length > 0) {
       await supabase.from('itens_ficha').insert(
         itens.map(item => ({
-          ...item,
           ficha_id: id,
+          ingrediente_id: item.ingredienteId,
+          quantidade: item.quantidade,
+          unidade: item.unidade,
+          custo: item.custo,
+          tipo: item.tipo,
         }))
       );
     }
 
+    // 3. Atualizar receitas base
     await supabase.from('receitas_base_ficha').delete().eq('ficha_produto_id', id);
     
     if (updates.receitasBaseIds && updates.receitasBaseIds.length > 0) {
@@ -492,12 +536,15 @@ export function useStorage() {
       );
     }
 
+    // 4. Atualizar estado local
     setData(prev => ({
       ...prev,
       fichasTecnicas: prev.fichasTecnicas.map(f => 
-        f.id === id ? { ...f, ...updates, ...fichaAtualizada } : f
+        f.id === id ? { ...f, ...updates } : f
       ),
     }));
+
+    toast.success('Ficha técnica atualizada!');
   }, [user]);
 
   const deleteFichaTecnica = useCallback(async (id: string) => {
@@ -519,6 +566,8 @@ export function useStorage() {
       ...prev,
       fichasTecnicas: prev.fichasTecnicas.filter(f => f.id !== id),
     }));
+
+    toast.success('Ficha técnica deletada!');
   }, [user]);
 
   // ========== PRODUÇÕES ==========
@@ -528,7 +577,12 @@ export function useStorage() {
     const { data: result, error } = await supabase
       .from('producoes')
       .insert([{
-        ...producao,
+        ficha_tecnica_id: producao.fichaTecnicaId,
+        quantidade_produzida: producao.quantidadeProduzida,
+        data_producao: producao.dataProducao,
+        data_validade: producao.dataValidade,
+        custo_total: producao.custoTotal,
+        observacao: producao.observacao,
         user_id: user.id,
         created_at: new Date().toISOString(),
       }])
@@ -537,16 +591,28 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao adicionar produção:', error);
-      toast.error('Erro ao adicionar produção');
+      toast.error('Erro ao adicionar produção: ' + error.message);
       return;
     }
 
+    const novaProducao: Producao = {
+      id: result.id,
+      fichaTecnicaId: result.ficha_tecnica_id,
+      quantidadeProduzida: result.quantidade_produzida,
+      dataProducao: result.data_producao,
+      dataValidade: result.data_validade,
+      custoTotal: result.custo_total,
+      observacao: result.observacao,
+      createdAt: result.created_at,
+    };
+
     setData(prev => ({
       ...prev,
-      producoes: [...prev.producoes, result],
+      producoes: [...prev.producoes, novaProducao],
     }));
 
-    return result;
+    toast.success('Produção registrada com sucesso!');
+    return novaProducao;
   }, [user]);
 
   const deleteProducao = useCallback(async (id: string) => {
@@ -568,6 +634,8 @@ export function useStorage() {
       ...prev,
       producoes: prev.producoes.filter(p => p.id !== id),
     }));
+
+    toast.success('Produção deletada!');
   }, [user]);
 
   // ========== TRANSAÇÕES ==========
@@ -577,7 +645,14 @@ export function useStorage() {
     const { data: result, error } = await supabase
       .from('transacoes')
       .insert([{
-        ...transacao,
+        tipo: transacao.tipo,
+        descricao: transacao.descricao,
+        valor: transacao.valor,
+        data: transacao.data,
+        categoria_id: transacao.categoriaId,
+        forma_pagamento: transacao.formaPagamento,
+        taxa_descontada: transacao.taxaDescontada,
+        valor_liquido: transacao.valorLiquido,
         user_id: user.id,
         created_at: new Date().toISOString(),
       }])
@@ -586,16 +661,30 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao adicionar transação:', error);
-      toast.error('Erro ao adicionar transação');
+      toast.error('Erro ao adicionar transação: ' + error.message);
       return;
     }
 
+    const novaTransacao: TransacaoDiaria = {
+      id: result.id,
+      tipo: result.tipo,
+      descricao: result.descricao,
+      valor: result.valor,
+      data: result.data,
+      categoriaId: result.categoria_id,
+      formaPagamento: result.forma_pagamento,
+      taxaDescontada: result.taxa_descontada,
+      valorLiquido: result.valor_liquido,
+      createdAt: result.created_at,
+    };
+
     setData(prev => ({
       ...prev,
-      transacoes: [...prev.transacoes, result],
+      transacoes: [...prev.transacoes, novaTransacao],
     }));
 
-    return result;
+    toast.success('Transação registrada com sucesso!');
+    return novaTransacao;
   }, [user]);
 
   const deleteTransacao = useCallback(async (id: string) => {
@@ -617,6 +706,8 @@ export function useStorage() {
       ...prev,
       transacoes: prev.transacoes.filter(t => t.id !== id),
     }));
+
+    toast.success('Transação deletada!');
   }, [user]);
 
   // ========== CONTAS A PAGAR ==========
@@ -626,7 +717,13 @@ export function useStorage() {
     const { data: result, error } = await supabase
       .from('contas_pagar')
       .insert([{
-        ...conta,
+        descricao: conta.descricao,
+        valor: conta.valor,
+        data_vencimento: conta.dataVencimento,
+        categoria_id: conta.categoriaId,
+        pago: conta.pago,
+        data_pagamento: conta.dataPagamento,
+        recorrente: conta.recorrente,
         user_id: user.id,
         created_at: new Date().toISOString(),
       }])
@@ -635,24 +732,46 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao adicionar conta:', error);
-      toast.error('Erro ao adicionar conta');
+      toast.error('Erro ao adicionar conta: ' + error.message);
       return;
     }
 
+    const novaConta: ContaPagar = {
+      id: result.id,
+      descricao: result.descricao,
+      valor: result.valor,
+      dataVencimento: result.data_vencimento,
+      categoriaId: result.categoria_id,
+      pago: result.pago,
+      dataPagamento: result.data_pagamento,
+      recorrente: result.recorrente,
+      createdAt: result.created_at,
+    };
+
     setData(prev => ({
       ...prev,
-      contasPagar: [...prev.contasPagar, result],
+      contasPagar: [...prev.contasPagar, novaConta],
     }));
 
-    return result;
+    toast.success('Conta adicionada com sucesso!');
+    return novaConta;
   }, [user]);
 
   const updateContaPagar = useCallback(async (id: string, updates: Partial<ContaPagar>) => {
     if (!user) return;
 
+    const dbUpdates: any = {};
+    if (updates.descricao !== undefined) dbUpdates.descricao = updates.descricao;
+    if (updates.valor !== undefined) dbUpdates.valor = updates.valor;
+    if (updates.dataVencimento !== undefined) dbUpdates.data_vencimento = updates.dataVencimento;
+    if (updates.categoriaId !== undefined) dbUpdates.categoria_id = updates.categoriaId;
+    if (updates.pago !== undefined) dbUpdates.pago = updates.pago;
+    if (updates.dataPagamento !== undefined) dbUpdates.data_pagamento = updates.dataPagamento;
+    if (updates.recorrente !== undefined) dbUpdates.recorrente = updates.recorrente;
+
     const { data: result, error } = await supabase
       .from('contas_pagar')
-      .update(updates)
+      .update(dbUpdates)
       .eq('id', id)
       .eq('user_id', user.id)
       .select()
@@ -660,14 +779,28 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao atualizar conta:', error);
-      toast.error('Erro ao atualizar conta');
+      toast.error('Erro ao atualizar conta: ' + error.message);
       return;
     }
 
+    const contaAtualizada: ContaPagar = {
+      id: result.id,
+      descricao: result.descricao,
+      valor: result.valor,
+      dataVencimento: result.data_vencimento,
+      categoriaId: result.categoria_id,
+      pago: result.pago,
+      dataPagamento: result.data_pagamento,
+      recorrente: result.recorrente,
+      createdAt: result.created_at,
+    };
+
     setData(prev => ({
       ...prev,
-      contasPagar: prev.contasPagar.map(c => c.id === id ? result : c),
+      contasPagar: prev.contasPagar.map(c => c.id === id ? contaAtualizada : c),
     }));
+
+    toast.success('Conta atualizada!');
   }, [user]);
 
   const deleteContaPagar = useCallback(async (id: string) => {
@@ -689,6 +822,8 @@ export function useStorage() {
       ...prev,
       contasPagar: prev.contasPagar.filter(c => c.id !== id),
     }));
+
+    toast.success('Conta deletada!');
   }, [user]);
 
   // ========== METAS ==========
@@ -698,7 +833,14 @@ export function useStorage() {
     const { data: result, error } = await supabase
       .from('metas')
       .insert([{
-        ...meta,
+        tipo: meta.tipo,
+        nome: meta.nome,
+        valor_meta: meta.valorMeta,
+        valor_acumulado: meta.valorAcumulado,
+        data_inicio: meta.dataInicio,
+        data_fim: meta.dataFim,
+        contribuicao_mensal: meta.contribuicaoMensal,
+        ativa: meta.ativa,
         user_id: user.id,
         created_at: new Date().toISOString(),
       }])
@@ -707,24 +849,48 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao adicionar meta:', error);
-      toast.error('Erro ao adicionar meta');
+      toast.error('Erro ao adicionar meta: ' + error.message);
       return;
     }
 
+    const novaMeta: Meta = {
+      id: result.id,
+      tipo: result.tipo,
+      nome: result.nome,
+      valorMeta: result.valor_meta,
+      valorAcumulado: result.valor_acumulado,
+      dataInicio: result.data_inicio,
+      dataFim: result.data_fim,
+      contribuicaoMensal: result.contribuicao_mensal,
+      ativa: result.ativa,
+      createdAt: result.created_at,
+    };
+
     setData(prev => ({
       ...prev,
-      metas: [...prev.metas, result],
+      metas: [...prev.metas, novaMeta],
     }));
 
-    return result;
+    toast.success('Meta adicionada com sucesso!');
+    return novaMeta;
   }, [user]);
 
   const updateMeta = useCallback(async (id: string, updates: Partial<Meta>) => {
     if (!user) return;
 
+    const dbUpdates: any = {};
+    if (updates.tipo !== undefined) dbUpdates.tipo = updates.tipo;
+    if (updates.nome !== undefined) dbUpdates.nome = updates.nome;
+    if (updates.valorMeta !== undefined) dbUpdates.valor_meta = updates.valorMeta;
+    if (updates.valorAcumulado !== undefined) dbUpdates.valor_acumulado = updates.valorAcumulado;
+    if (updates.dataInicio !== undefined) dbUpdates.data_inicio = updates.dataInicio;
+    if (updates.dataFim !== undefined) dbUpdates.data_fim = updates.dataFim;
+    if (updates.contribuicaoMensal !== undefined) dbUpdates.contribuicao_mensal = updates.contribuicaoMensal;
+    if (updates.ativa !== undefined) dbUpdates.ativa = updates.ativa;
+
     const { data: result, error } = await supabase
       .from('metas')
-      .update(updates)
+      .update(dbUpdates)
       .eq('id', id)
       .eq('user_id', user.id)
       .select()
@@ -732,14 +898,29 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao atualizar meta:', error);
-      toast.error('Erro ao atualizar meta');
+      toast.error('Erro ao atualizar meta: ' + error.message);
       return;
     }
 
+    const metaAtualizada: Meta = {
+      id: result.id,
+      tipo: result.tipo,
+      nome: result.nome,
+      valorMeta: result.valor_meta,
+      valorAcumulado: result.valor_acumulado,
+      dataInicio: result.data_inicio,
+      dataFim: result.data_fim,
+      contribuicaoMensal: result.contribuicao_mensal,
+      ativa: result.ativa,
+      createdAt: result.created_at,
+    };
+
     setData(prev => ({
       ...prev,
-      metas: prev.metas.map(m => m.id === id ? result : m),
+      metas: prev.metas.map(m => m.id === id ? metaAtualizada : m),
     }));
+
+    toast.success('Meta atualizada!');
   }, [user]);
 
   const deleteMeta = useCallback(async (id: string) => {
@@ -761,6 +942,8 @@ export function useStorage() {
       ...prev,
       metas: prev.metas.filter(m => m.id !== id),
     }));
+
+    toast.success('Meta deletada!');
   }, [user]);
 
   // ========== CONFIGURAÇÕES ==========
@@ -773,18 +956,21 @@ export function useStorage() {
       .from('configuracoes')
       .upsert({
         user_id: user.id,
-        ...configRest,
+        taxas: configRest.taxas,
+        cmv_percentual_padrao: configRest.cmvPercentualPadrao,
+        margem_lucro_padrao: configRest.margemLucroPadrao,
+        nome_estabelecimento: configRest.nomeEstabelecimento,
+        logo_url: configRest.logoUrl,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id' });
 
     if (configError) {
       console.error('Erro ao atualizar configurações:', configError);
-      toast.error('Erro ao atualizar configurações');
+      toast.error('Erro ao atualizar configurações: ' + configError.message);
     }
 
     if (custosFixos) {
       await supabase.from('custos_fixos').delete().eq('user_id', user.id);
-      
       if (custosFixos.length > 0) {
         await supabase.from('custos_fixos').insert(
           custosFixos.map(c => ({ ...c, user_id: user.id }))
@@ -794,7 +980,6 @@ export function useStorage() {
 
     if (custosVariaveis) {
       await supabase.from('custos_variaveis').delete().eq('user_id', user.id);
-      
       if (custosVariaveis.length > 0) {
         await supabase.from('custos_variaveis').insert(
           custosVariaveis.map(c => ({ ...c, user_id: user.id }))
@@ -806,6 +991,8 @@ export function useStorage() {
       ...prev,
       configuracoes: { ...prev.configuracoes, ...config },
     }));
+
+    toast.success('Configurações atualizadas!');
   }, [user]);
 
   // ========== CATEGORIAS DE CONTAS ==========
@@ -869,7 +1056,7 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao atualizar categoria de conta:', error);
-      toast.error('Erro ao atualizar categoria');
+      toast.error('Erro ao atualizar categoria: ' + error.message);
       return;
     }
 
@@ -970,7 +1157,7 @@ export function useStorage() {
 
     if (error) {
       console.error('Erro ao atualizar categoria de produto:', error);
-      toast.error('Erro ao atualizar categoria');
+      toast.error('Erro ao atualizar categoria: ' + error.message);
       return;
     }
 
