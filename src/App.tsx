@@ -12,9 +12,7 @@ import { ProducaoSection } from '@/sections/Producao';
 import { Precificacao } from '@/sections/Precificacao';
 import { Relatorios } from '@/sections/Relatorios';
 import { ConfiguracoesSection } from '@/sections/Configuracoes';
-import { useStorage } from '@/hooks/useStorage';
 import { Toaster } from '@/components/ui/sonner';
-import { toast } from 'sonner';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import Auth from '@/sections/Auth';
@@ -122,60 +120,6 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 function MainApp() {
   const [currentModule, setCurrentModule] = useState<ModuleType>('dashboard');
   const { signOut } = useAuth();
-  const {
-    data,
-    isLoaded,
-    addIngrediente,
-    updateIngrediente,
-    deleteIngrediente,
-    updateFichaTecnica,
-    addProducao,
-    deleteProducao,
-    addTransacao,
-    deleteTransacao,
-    addContaPagar,
-    updateContaPagar,
-    deleteContaPagar,
-    addMeta,
-    updateMeta,
-    deleteMeta,
-  } = useStorage();
-
-  if (!isLoaded) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-center">
-          <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-600 rounded-xl flex items-center justify-center mx-auto mb-4 animate-pulse">
-            <span className="text-white font-bold text-xl">D</span>
-          </div>
-          <p className="text-gray-600 dark:text-gray-400">Carregando DoceGestão...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const handleAddTransacao = (transacao: Parameters<typeof addTransacao>[0]) => {
-    addTransacao(transacao);
-    const tipo = transacao.tipo === 'receita' ? 'Receita' : 'Despesa';
-    toast.success(`${tipo} registrada com sucesso!`);
-  };
-
-  const handleAddProducao = (producao: Parameters<typeof addProducao>[0]) => {
-    addProducao(producao);
-    toast.success('Produção registrada com sucesso!');
-  };
-
-  const handleAddMeta = (meta: Parameters<typeof addMeta>[0]) => {
-    addMeta(meta);
-    toast.success('Meta criada com sucesso!');
-  };
-
-  const handleUpdateMeta = (id: string, updates: Parameters<typeof updateMeta>[1]) => {
-    updateMeta(id, updates);
-    if (updates.valorAcumulado !== undefined) {
-      toast.success('Valor adicionado à meta!');
-    }
-  };
 
   const renderModule = () => {
     try {
@@ -183,101 +127,73 @@ function MainApp() {
         case 'dashboard':
           return (
             <ErrorBoundary key="dashboard">
-              <Dashboard data={data} />
+              <Dashboard />
             </ErrorBoundary>
           );
         case 'caixa':
           return (
             <ErrorBoundary key="caixa">
-              <CaixaDiario
-                data={data}
-                onAddTransacao={handleAddTransacao}
-                onDeleteTransacao={deleteTransacao}
-              />
+              <CaixaDiario />
             </ErrorBoundary>
           );
         case 'contas':
           return (
             <ErrorBoundary key="contas">
-              <ContasPagar
-                data={data}
-                onAddConta={addContaPagar}
-                onUpdateConta={updateContaPagar}
-                onDeleteConta={deleteContaPagar}
-              />
+              <ContasPagar />
             </ErrorBoundary>
           );
         case 'resultado':
           return (
             <ErrorBoundary key="resultado">
-              <ResultadoMensal data={data} />
+              <ResultadoMensal />
             </ErrorBoundary>
           );
         case 'metas':
           return (
             <ErrorBoundary key="metas">
-              <Metas
-                data={data}
-                onAddMeta={handleAddMeta}
-                onUpdateMeta={handleUpdateMeta}
-                onDeleteMeta={deleteMeta}
-              />
+              <Metas />
             </ErrorBoundary>
           );
         case 'ingredientes':
           return (
             <ErrorBoundary key="ingredientes">
-              <Ingredientes
-                data={data}
-                onAddIngrediente={addIngrediente}
-                onUpdateIngrediente={updateIngrediente}
-                onDeleteIngrediente={deleteIngrediente}
-              />
+              <Ingredientes />
             </ErrorBoundary>
           );
         case 'fichatecnica':
           return (
             <ErrorBoundary key="fichatecnica">
-              <FichaTecnicaSection
-                data={data}
-              />
+              <FichaTecnicaSection />
             </ErrorBoundary>
           );
         case 'producao':
           return (
             <ErrorBoundary key="producao">
-              <ProducaoSection
-                data={data}
-                onAddProducao={handleAddProducao}
-                onDeleteProducao={deleteProducao}
-              />
+              <ProducaoSection />
             </ErrorBoundary>
           );
         case 'precificacao':
           return (
             <ErrorBoundary key="precificacao">
-              <Precificacao
-                data={data}
-                onUpdateFicha={updateFichaTecnica}
-              />
+              <Precificacao />
             </ErrorBoundary>
           );
         case 'relatorios':
           return (
             <ErrorBoundary key="relatorios">
-              <Relatorios data={data} />
+              <Relatorios />
             </ErrorBoundary>
           );
         case 'configuracoes':
           return (
             <ErrorBoundary key="configuracoes">
-              <ConfiguracoesSection /> {/* ← NÃO PASSA MAIS A PROP DATA */}
+              <ConfiguracoesSection />
             </ErrorBoundary>
           );
         default:
           return (
             <ErrorBoundary key="dashboard-default">
-              <Dashboard data={data} />
+              <Dashboard />
             </ErrorBoundary>
           );
       }
@@ -299,7 +215,6 @@ function MainApp() {
       <MainLayout 
         currentModule={currentModule} 
         onModuleChange={setCurrentModule}
-        configuracoes={data?.configuracoes}
         onLogout={signOut}
       >
         {renderModule()}
