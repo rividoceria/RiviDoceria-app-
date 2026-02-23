@@ -15,7 +15,6 @@ import { StatCard } from '@/components/ui-custom/StatCard';
 import { ProgressBar } from '@/components/ui-custom/ProgressBar';
 import { AlertCard } from '@/components/ui-custom/AlertCard';
 import { formatCurrency, formatPercentage, formatDate } from '@/lib/format';
-import type { SistemaData, FormaPagamento } from '@/types';
 import { useCalculations } from '@/hooks/useCalculations';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -178,7 +177,7 @@ export function Dashboard() {
               <p className="text-gray-500 text-center py-4">Nenhuma receita no mês</p>
             ) : (
               <div className="space-y-3">
-                {(Object.entries(resumoPorFormaPagamento) as [FormaPagamento, number][])
+                {Object.entries(resumoPorFormaPagamento)
                   .sort((a, b) => b[1] - a[1])
                   .map(([forma, valor]) => (
                     <div key={forma} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
