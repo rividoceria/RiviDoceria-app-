@@ -14,13 +14,10 @@ import { supabase } from '@/lib/supabase';
 import type { CategoriaConta, CategoriaProduto, CustoFixo, CustoVariavel } from '@/types';
 import { toast } from 'sonner';
 
-interface ConfiguracoesProps {
-  data: any;
-}
-
-export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
+export function ConfiguracoesSection() {
   const { user } = useAuth();
   const { 
+    data,
     updateConfiguracoes,
     addCategoriaConta,
     updateCategoriaConta,
@@ -257,14 +254,13 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     setValorVariavel('');
   };
 
-  // ========== CATEGORIAS DE CONTAS (USANDO USESTORAGE) ==========
+  // ========== CATEGORIAS DE CONTAS ==========
   const handleAddCategoriaConta = async () => {
     if (!user || !nome) return;
 
-    // CORREÇÃO: Converter para undefined em vez de null
     const limiteGastoValue = limiteGasto && limiteGasto.trim() !== '' ? parseFloat(limiteGasto) : undefined;
 
-    // Usar a função do useStorage que já atualiza o estado global
+    // Usar a função do useStorage
     await addCategoriaConta({
       nome,
       tipo,
@@ -277,7 +273,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     setTipo('fixa');
     setLimiteGasto('');
     setIsDialogOpen(false);
-    toast.success('Categoria adicionada com sucesso!');
   };
 
   const handleEditCategoriaConta = (categoria: CategoriaConta) => {
@@ -291,10 +286,8 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
   const handleSaveEditCategoriaConta = async (id: string) => {
     if (!user || !nome) return;
 
-    // CORREÇÃO: Converter para undefined em vez de null
     const limiteGastoValue = limiteGasto && limiteGasto.trim() !== '' ? parseFloat(limiteGasto) : undefined;
 
-    // Usar a função do useStorage
     await updateCategoriaConta(id, {
       nome,
       tipo,
@@ -304,15 +297,12 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
 
     setEditandoCategoria(null);
     resetCategoriaForm();
-    toast.success('Categoria atualizada!');
   };
 
   const handleDeleteCategoriaConta = async (id: string) => {
     if (!user) return;
 
-    // Usar a função do useStorage
     await deleteCategoriaConta(id);
-    toast.success('Categoria deletada!');
   };
 
   const cancelEditCategoria = () => {
@@ -320,7 +310,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     resetCategoriaForm();
   };
 
-  // ========== CATEGORIAS DE PRODUTOS (USANDO USESTORAGE) ==========
+  // ========== CATEGORIAS DE PRODUTOS ==========
   const handleAddCategoriaProduto = async () => {
     if (!user || !nome || !margemPadrao) return;
 
@@ -330,7 +320,7 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    // Usar a função do useStorage que já atualiza o estado global
+    // Usar a função do useStorage
     await addCategoriaProduto({
       nome,
       margemPadrao: margemValue,
@@ -341,7 +331,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
     setCor('#f472b6');
     setMargemPadrao('');
     setIsDialogOpen(false);
-    toast.success('Categoria adicionada com sucesso!');
   };
 
   const handleEditCategoriaProduto = (categoria: CategoriaProduto) => {
@@ -360,7 +349,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
       return;
     }
 
-    // Usar a função do useStorage
     await updateCategoriaProduto(id, {
       nome,
       margemPadrao: margemValue,
@@ -369,15 +357,12 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
 
     setEditandoCategoria(null);
     resetCategoriaForm();
-    toast.success('Categoria atualizada!');
   };
 
   const handleDeleteCategoriaProduto = async (id: string) => {
     if (!user) return;
 
-    // Usar a função do useStorage
     await deleteCategoriaProduto(id);
-    toast.success('Categoria deletada!');
   };
 
   // ========== TAXAS ==========
@@ -536,15 +521,6 @@ export function ConfiguracoesSection({ data }: ConfiguracoesProps) {
 
   const totalFixos = (configuracoes.custosFixos || []).reduce((acc: number, c: CustoFixo) => acc + (c?.valor || 0), 0);
   const totalVariaveis = (configuracoes.custosVariaveis || []).reduce((acc: number, c: CustoVariavel) => acc + (c?.valor || 0), 0);
-
-  // Se não houver dados, mostrar loading
-  if (!data) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <p className="text-gray-500">Carregando configurações...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
