@@ -9,11 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { formatCurrency, formatNumber } from '@/lib/format';
-import type { Producao } from '@/types';
 import { useCalculations } from '@/hooks/useCalculations';
 import { format, differenceInDays } from 'date-fns';
 import { useStorage } from '@/hooks/useStorage';
-import { toast } from 'sonner';
 
 export function ProducaoSection() {
   const { data, addProducao, deleteProducao } = useStorage();
