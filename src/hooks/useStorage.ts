@@ -122,20 +122,23 @@ export function useStorage() {
 
         // Montar os dados no formato esperado pelo app
         const loadedData: SistemaData = {
-          // CORREÇÃO: Ingredientes com conversão explícita
-          ingredientes: (ingredientes.data || []).map((item: any) => ({
-            id: item.id,
-            nome: item.nome,
-            quantidadeEmbalagem: item.quantidade_embalagem,
-            unidade: item.unidade,
-            precoEmbalagem: item.preco_embalagem, // ← CORREÇÃO AQUI
-            custoUnidade: item.custo_unidade,
-            estoqueAtual: item.quantidade_estoque,
-            estoqueMinimo: item.estoque_minimo,
-            tipo: item.tipo,
-            createdAt: item.created_at,
-            updatedAt: item.created_at,
-          })),
+          // CORREÇÃO: Ingredientes - calcular precoEmbalagem a partir de custo_unidade e quantidade_embalagem
+          ingredientes: (ingredientes.data || []).map((item: any) => {
+            const precoEmbalagemCalculado = item.custo_unidade * item.quantidade_embalagem;
+            return {
+              id: item.id,
+              nome: item.nome,
+              quantidadeEmbalagem: item.quantidade_embalagem,
+              unidade: item.unidade,
+              precoEmbalagem: precoEmbalagemCalculado, // ← CALCULADO
+              custoUnidade: item.custo_unidade,
+              estoqueAtual: item.quantidade_estoque,
+              estoqueMinimo: item.estoque_minimo,
+              tipo: item.tipo,
+              createdAt: item.created_at,
+              updatedAt: item.created_at,
+            };
+          }),
           
           fichasTecnicas: (fichasTecnicas.data || []).map((ficha: any) => ({
             ...ficha,
@@ -185,7 +188,7 @@ export function useStorage() {
     loadData();
   }, [user]);
 
-  // ========== INGREDIENTES (CORRIGIDO) ==========
+  // ========== INGREDIENTES (CORRIGIDO - SEM PRECO_EMBALAGEM) ==========
   const addIngrediente = useCallback(async (ingrediente: Omit<Ingrediente, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!user) {
       toast.error('Usuário não logado');
@@ -194,13 +197,15 @@ export function useStorage() {
 
     console.log('📝 Adicionando ingrediente:', ingrediente);
 
+    // Calcular custo_unidade a partir do precoEmbalagem e quantidadeEmbalagem
+    const custoUnidadeCalculado = ingrediente.precoEmbalagem / ingrediente.quantidadeEmbalagem;
+
     const newIngrediente = {
       user_id: user.id,
       nome: ingrediente.nome,
       tipo: ingrediente.tipo,
       unidade: ingrediente.unidade,
-      preco_embalagem: ingrediente.precoEmbalagem, // ← CORREÇÃO
-      custo_unidade: ingrediente.custoUnidade,
+      custo_unidade: custoUnidadeCalculado, // ← APENAS custo_unidade (preco_embalagem NÃO EXISTE)
       quantidade_embalagem: ingrediente.quantidadeEmbalagem,
       estoque_minimo: ingrediente.estoqueMinimo,
       quantidade_estoque: ingrediente.estoqueAtual,
@@ -223,12 +228,15 @@ export function useStorage() {
 
     console.log('✅ Ingrediente adicionado no Supabase:', result);
 
+    // Calcular precoEmbalagem a partir do resultado
+    const precoEmbalagemCalculado = result.custo_unidade * result.quantidade_embalagem;
+
     const novoIngrediente: Ingrediente = {
       id: result.id,
       nome: result.nome,
       quantidadeEmbalagem: result.quantidade_embalagem,
       unidade: result.unidade,
-      precoEmbalagem: result.preco_embalagem, // ← CORREÇÃO
+      precoEmbalagem: precoEmbalagemCalculado, // ← CALCULADO
       custoUnidade: result.custo_unidade,
       estoqueAtual: result.quantidade_estoque,
       estoqueMinimo: result.estoque_minimo,
@@ -257,11 +265,21 @@ export function useStorage() {
     if (updates.nome !== undefined) dbUpdates.nome = updates.nome;
     if (updates.tipo !== undefined) dbUpdates.tipo = updates.tipo;
     if (updates.unidade !== undefined) dbUpdates.unidade = updates.unidade;
-    if (updates.precoEmbalagem !== undefined) dbUpdates.preco_embalagem = updates.precoEmbalagem; // ← CORREÇÃO
-    if (updates.custoUnidade !== undefined) dbUpdates.custo_unidade = updates.custoUnidade;
     if (updates.quantidadeEmbalagem !== undefined) dbUpdates.quantidade_embalagem = updates.quantidadeEmbalagem;
     if (updates.estoqueMinimo !== undefined) dbUpdates.estoque_minimo = updates.estoqueMinimo;
     if (updates.estoqueAtual !== undefined) dbUpdates.quantidade_estoque = updates.estoqueAtual;
+    
+    // Lógica para atualizar custo_unidade baseado em precoEmbalagem
+    if (updates.precoEmbalagem !== undefined) {
+      // Precisamos saber a quantidade atual
+      const ingredienteAtual = data.ingredientes.find(i => i.id === id);
+      if (ingredienteAtual) {
+        const quantidade = updates.quantidadeEmbalagem ?? ingredienteAtual.quantidadeEmbalagem;
+        dbUpdates.custo_unidade = updates.precoEmbalagem / quantidade;
+      }
+    } else if (updates.custoUnidade !== undefined) {
+      dbUpdates.custo_unidade = updates.custoUnidade;
+    }
 
     const { data: result, error } = await supabase
       .from('ingredientes')
@@ -277,12 +295,15 @@ export function useStorage() {
       return;
     }
 
+    // Calcular precoEmbalagem a partir do resultado
+    const precoEmbalagemCalculado = result.custo_unidade * result.quantidade_embalagem;
+
     const ingredienteAtualizado: Ingrediente = {
       id: result.id,
       nome: result.nome,
       quantidadeEmbalagem: result.quantidade_embalagem,
       unidade: result.unidade,
-      precoEmbalagem: result.preco_embalagem, // ← CORREÇÃO
+      precoEmbalagem: precoEmbalagemCalculado, // ← CALCULADO
       custoUnidade: result.custo_unidade,
       estoqueAtual: result.quantidade_estoque,
       estoqueMinimo: result.estoque_minimo,
@@ -297,7 +318,7 @@ export function useStorage() {
     }));
 
     toast.success('Ingrediente atualizado!');
-  }, [user]);
+  }, [user, data.ingredientes]);
 
   const deleteIngrediente = useCallback(async (id: string) => {
     if (!user) return;
