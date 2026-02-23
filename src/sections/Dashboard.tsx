@@ -19,26 +19,10 @@ import type { SistemaData, FormaPagamento } from '@/types';
 import { useCalculations } from '@/hooks/useCalculations';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useStorage } from '@/hooks/useStorage';
 
-interface DashboardProps {
-  data: SistemaData;
-}
-
-const formaPagamentoIcons: Record<FormaPagamento, React.ReactNode> = {
-  dinheiro: <Banknote className="w-4 h-4" />,
-  pix: <Smartphone className="w-4 h-4" />,
-  debito: <CreditCard className="w-4 h-4" />,
-  credito: <CreditCard className="w-4 h-4" />,
-};
-
-const formaPagamentoLabels: Record<FormaPagamento, string> = {
-  dinheiro: 'Dinheiro',
-  pix: 'Pix',
-  debito: 'Débito',
-  credito: 'Crédito',
-};
-
-export function Dashboard({ data }: DashboardProps) {
+export function Dashboard() {
+  const { data } = useStorage();
   const { dashboardData } = useCalculations(data);
 
   const {
@@ -200,9 +184,17 @@ export function Dashboard({ data }: DashboardProps) {
                     <div key={forma} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                          {formaPagamentoIcons[forma]}
+                          {forma === 'dinheiro' && <Banknote className="w-5 h-5 text-blue-600" />}
+                          {forma === 'pix' && <Smartphone className="w-5 h-5 text-blue-600" />}
+                          {forma === 'debito' && <CreditCard className="w-5 h-5 text-blue-600" />}
+                          {forma === 'credito' && <CreditCard className="w-5 h-5 text-blue-600" />}
                         </div>
-                        <span className="font-medium text-gray-900">{formaPagamentoLabels[forma]}</span>
+                        <span className="font-medium text-gray-900">
+                          {forma === 'dinheiro' && 'Dinheiro'}
+                          {forma === 'pix' && 'Pix'}
+                          {forma === 'debito' && 'Débito'}
+                          {forma === 'credito' && 'Crédito'}
+                        </span>
                       </div>
                       <span className="font-semibold text-gray-900">{formatCurrency(valor)}</span>
                     </div>
@@ -229,19 +221,19 @@ export function Dashboard({ data }: DashboardProps) {
               <div className="flex justify-between p-3 bg-gray-50 rounded-lg">
                 <span className="text-gray-600">Custos Fixos</span>
                 <span className="font-semibold text-red-600">
-                  -{formatCurrency(data.configuracoes.custosFixos.reduce((a, c) => a + c.valor, 0))}
+                  -{formatCurrency(data?.configuracoes?.custosFixos?.reduce((a, c) => a + c.valor, 0) || 0)}
                 </span>
               </div>
               <div className="flex justify-between p-3 bg-gray-50 rounded-lg">
                 <span className="text-gray-600">Custos Variáveis</span>
                 <span className="font-semibold text-red-600">
-                  -{formatCurrency(data.configuracoes.custosVariaveis.reduce((a, c) => a + c.valor, 0))}
+                  -{formatCurrency(data?.configuracoes?.custosVariaveis?.reduce((a, c) => a + c.valor, 0) || 0)}
                 </span>
               </div>
               <div className="flex justify-between p-3 bg-gray-50 rounded-lg">
-                <span className="text-gray-600">CMV ({data.configuracoes.cmvPercentualPadrao}%)</span>
+                <span className="text-gray-600">CMV ({data?.configuracoes?.cmvPercentualPadrao || 30}%)</span>
                 <span className="font-semibold text-red-600">
-                  -{formatCurrency(faturamentoMes * (data.configuracoes.cmvPercentualPadrao / 100))}
+                  -{formatCurrency(faturamentoMes * ((data?.configuracoes?.cmvPercentualPadrao || 30) / 100))}
                 </span>
               </div>
               <div className="border-t pt-3">
