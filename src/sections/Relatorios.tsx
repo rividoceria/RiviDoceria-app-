@@ -5,19 +5,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency } from '@/lib/format';
-import type { SistemaData } from '@/types';
 import { useCalculations } from '@/hooks/useCalculations';
 import { format, parseISO, subMonths, eachMonthOfInterval, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart as RePieChart, Pie, Cell } from 'recharts';
-
-interface RelatoriosProps {
-  data: SistemaData;
-}
+import { useStorage } from '@/hooks/useStorage';
 
 const COLORS = ['#f472b6', '#60a5fa', '#34d399', '#fbbf24', '#a78bfa', '#f87171', '#22d3ee', '#fb923c'];
 
-export function Relatorios({ data }: RelatoriosProps) {
+export function Relatorios() {
+  const { data } = useStorage();
+  
   const [mesInicio, setMesInicio] = useState(format(subMonths(new Date(), 5), 'yyyy-MM'));
   const [mesFim, setMesFim] = useState(format(new Date(), 'yyyy-MM'));
   const [activeTab, setActiveTab] = useState('evolucao');
@@ -76,13 +74,11 @@ export function Relatorios({ data }: RelatoriosProps) {
         }
       });
 
-      // Adicionar custos fixos do último mês do período
       const custosFixos = data?.configuracoes?.custosFixos?.reduce((acc: number, c: any) => acc + (c?.valor || 0), 0) || 0;
       if (custosFixos > 0) {
         categorias['custos_fixos'] = { nome: 'Custos Fixos', valor: custosFixos, cor: '#ef4444' };
       }
 
-      // Adicionar custos variáveis
       const custosVariaveis = data?.configuracoes?.custosVariaveis?.reduce((acc: number, c: any) => acc + (c?.valor || 0), 0) || 0;
       if (custosVariaveis > 0) {
         categorias['custos_variaveis'] = { nome: 'Custos Variáveis', valor: custosVariaveis, cor: '#f97316' };
