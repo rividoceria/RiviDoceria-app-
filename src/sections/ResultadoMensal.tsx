@@ -5,17 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { StatCard } from '@/components/ui-custom/StatCard';
 import { formatCurrency, formatPercentage } from '@/lib/format';
-import type { SistemaData } from '@/types';
 import { useCalculations } from '@/hooks/useCalculations';
 import { format, parseISO, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from 'recharts';
+import { useStorage } from '@/hooks/useStorage';
 
-interface ResultadoMensalProps {
-  data: SistemaData;
-}
-
-export function ResultadoMensal({ data }: ResultadoMensalProps) {
+export function ResultadoMensal() {
+  const { data } = useStorage();
   const [mesSelecionado, setMesSelecionado] = useState(format(new Date(), 'yyyy-MM'));
   const { resultadoMensal } = useCalculations(data);
 
