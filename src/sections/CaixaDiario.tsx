@@ -8,35 +8,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency } from '@/lib/format';
-import type { SistemaData, TransacaoDiaria, FormaPagamento, TipoTransacao } from '@/types';
+import type { TransacaoDiaria, FormaPagamento, TipoTransacao } from '@/types';
 import { useCalculations } from '@/hooks/useCalculations';
 import { format } from 'date-fns';
+import { useStorage } from '@/hooks/useStorage';
+import { toast } from 'sonner';
 
-interface CaixaDiarioProps {
-  data: SistemaData;
-  onAddTransacao: (transacao: Omit<TransacaoDiaria, 'id' | 'createdAt'>) => void;
-  onDeleteTransacao: (id: string) => void;
-}
-
-const formaPagamentoIcons: Record<FormaPagamento, React.ReactNode> = {
-  dinheiro: <Banknote className="w-4 h-4" />,
-  pix: <Smartphone className="w-4 h-4" />,
-  debito: <CreditCard className="w-4 h-4" />,
-  credito: <CreditCard className="w-4 h-4" />,
-};
-
-const formaPagamentoLabels: Record<FormaPagamento, string> = {
-  dinheiro: 'Dinheiro',
-  pix: 'Pix',
-  debito: 'Cartão Débito',
-  credito: 'Cartão Crédito',
-};
-
-export function CaixaDiario({ 
-  data, 
-  onAddTransacao, 
-  onDeleteTransacao 
-}: CaixaDiarioProps) {
+export function CaixaDiario() {
+  const { data, addTransacao, deleteTransacao } = useStorage();
+  
   const [activeTab, setActiveTab] = useState('receitas');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   
@@ -52,8 +32,8 @@ export function CaixaDiario({
 
   // Transações do dia selecionado
   const transacoesDoDia = useMemo(() => {
-    return data.transacoes.filter(t => t.data.startsWith(dataSelecionada));
-  }, [data.transacoes, dataSelecionada]);
+    return (data?.transacoes || []).filter(t => t.data.startsWith(dataSelecionada));
+  }, [data?.transacoes, dataSelecionada]);
 
   const receitasDoDia = transacoesDoDia.filter(t => t.tipo === 'receita');
   const despesasDoDia = transacoesDoDia.filter(t => t.tipo === 'despesa');
@@ -73,14 +53,14 @@ export function CaixaDiario({
     return { totalReceitas, totalDespesas, saldo, receitasPorForma };
   }, [receitasDoDia, despesasDoDia]);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!descricao || !valor) return;
     
     const valorNum = parseFloat(valor);
     const taxaDescontada = calcularTaxa(formaPagamento, valorNum);
     const valorLiquido = calcularValorLiquido(formaPagamento, valorNum);
     
-    onAddTransacao({
+    await addTransacao({
       data: dataSelecionada,
       tipo: tipoTransacao,
       descricao,
@@ -96,6 +76,24 @@ export function CaixaDiario({
     setValor('');
     setCategoriaId('');
     setIsDialogOpen(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    await deleteTransacao(id);
+  };
+
+  const formaPagamentoIcons: Record<FormaPagamento, React.ReactNode> = {
+    dinheiro: <Banknote className="w-4 h-4" />,
+    pix: <Smartphone className="w-4 h-4" />,
+    debito: <CreditCard className="w-4 h-4" />,
+    credito: <CreditCard className="w-4 h-4" />,
+  };
+
+  const formaPagamentoLabels: Record<FormaPagamento, string> = {
+    dinheiro: 'Dinheiro',
+    pix: 'Pix',
+    debito: 'Cartão Débito',
+    credito: 'Cartão Crédito',
   };
 
   return (
@@ -183,7 +181,7 @@ export function CaixaDiario({
                       <SelectValue placeholder="Selecione uma categoria" />
                     </SelectTrigger>
                     <SelectContent>
-                      {data.categoriasConta.map((cat) => (
+                      {(data?.categoriasConta || []).map((cat) => (
                         <SelectItem key={cat.id} value={cat.id}>
                           {cat.nome}
                         </SelectItem>
@@ -200,7 +198,7 @@ export function CaixaDiario({
                     <span className="font-medium">{formatCurrency(parseFloat(valor) || 0)}</span>
                   </p>
                   <p className="flex justify-between text-gray-500">
-                    <span>Taxa ({formaPagamento === 'dinheiro' ? 0 : data.configuracoes.taxas[formaPagamento]}%):</span>
+                    <span>Taxa ({formaPagamento === 'dinheiro' ? 0 : data?.configuracoes?.taxas[formaPagamento]}%):</span>
                     <span>-{formatCurrency(calcularTaxa(formaPagamento, parseFloat(valor) || 0))}</span>
                   </p>
                   <p className="flex justify-between font-semibold text-green-600">
@@ -320,7 +318,7 @@ export function CaixaDiario({
                           variant="ghost"
                           size="icon"
                           className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => onDeleteTransacao(transacao.id)}
+                          onClick={() => handleDelete(transacao.id)}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -344,7 +342,7 @@ export function CaixaDiario({
             <div className="space-y-3">
               {despesasDoDia.map((transacao) => {
                 const categoria = transacao.categoriaId 
-                  ? data.categoriasConta.find(c => c.id === transacao.categoriaId)
+                  ? data?.categoriasConta?.find(c => c.id === transacao.categoriaId)
                   : null;
                 return (
                   <Card key={transacao.id}>
@@ -367,7 +365,7 @@ export function CaixaDiario({
                             variant="ghost"
                             size="icon"
                             className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => onDeleteTransacao(transacao.id)}
+                            onClick={() => handleDelete(transacao.id)}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
