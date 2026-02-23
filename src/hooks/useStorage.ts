@@ -63,7 +63,7 @@ export function useStorage() {
   const [data, setData] = useState<SistemaData>(defaultData);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // ========== CARREGAR DADOS DO SUPABASE ==========
+  // ========== CARREGAR DADOS DO SUPABASE (CORRIGIDO) ==========
   useEffect(() => {
     async function loadData() {
       if (!user) {
@@ -72,6 +72,7 @@ export function useStorage() {
       }
 
       try {
+        // Carregar todas as tabelas em paralelo
         const [
           categoriasProduto,
           categoriasConta,
@@ -98,6 +99,7 @@ export function useStorage() {
           supabase.from('configuracoes').select('*').eq('user_id', user.id).maybeSingle()
         ]);
 
+        // Carregar itens das fichas técnicas
         let itensFicha: any[] = [];
         if (fichasTecnicas.data && fichasTecnicas.data.length > 0) {
           const fichaIds = fichasTecnicas.data.map(f => f.id);
@@ -108,6 +110,7 @@ export function useStorage() {
           itensFicha = itensResult.data || [];
         }
 
+        // Carregar receitas base
         let receitasBase: any[] = [];
         if (fichasTecnicas.data && fichasTecnicas.data.length > 0) {
           const fichaIds = fichasTecnicas.data.map(f => f.id);
@@ -118,7 +121,13 @@ export function useStorage() {
           receitasBase = receitasResult.data || [];
         }
 
+        // LOG PARA DEBUG
+        console.log('📊 [LOAD] Categorias do Supabase:', categoriasProduto.data);
+        console.log('📊 [LOAD] Primeira categoria:', categoriasProduto.data?.[0]);
+
+        // Montar os dados no formato esperado pelo app (CORRIGIDO)
         const loadedData: SistemaData = {
+          // Ingredientes com conversão correta
           ingredientes: (ingredientes.data || []).map((item: any) => ({
             id: item.id,
             nome: item.nome,
@@ -132,6 +141,8 @@ export function useStorage() {
             createdAt: item.created_at,
             updatedAt: item.created_at,
           })),
+          
+          // Fichas técnicas
           fichasTecnicas: (fichasTecnicas.data || []).map((ficha: any) => ({
             ...ficha,
             itens: itensFicha.filter(item => item.ficha_id === ficha.id && item.tipo === 'ingrediente'),
@@ -140,12 +151,30 @@ export function useStorage() {
               .filter(r => r.ficha_produto_id === ficha.id)
               .map(r => r.receita_base_id)
           })),
-          categoriasProduto: categoriasProduto.data || defaultCategoriasProduto,
+          
+          // CORREÇÃO CRÍTICA: Categorias de produto com conversão explícita
+          categoriasProduto: (categoriasProduto.data || []).map((item: any) => ({
+            id: item.id,
+            nome: item.nome,
+            margemPadrao: item.margem_padrao, // ← GARANTINDO A CONVERSÃO
+            cor: item.cor,
+          })),
+          
+          // CORREÇÃO CRÍTICA: Categorias de conta com conversão explícita
+          categoriasConta: (categoriasConta.data || []).map((item: any) => ({
+            id: item.id,
+            nome: item.nome,
+            tipo: item.tipo,
+            limiteGasto: item.limite_gasto, // ← GARANTINDO A CONVERSÃO
+            cor: item.cor,
+          })),
+          
           producoes: producoes.data || [],
           transacoes: transacoes.data || [],
           contasPagar: contasPagar.data || [],
-          categoriasConta: categoriasConta.data || defaultCategoriasConta,
           metas: metas.data || [],
+          
+          // Configurações com custos
           configuracoes: configuracoes.data ? {
             ...defaultConfig,
             ...configuracoes.data,
@@ -154,6 +183,7 @@ export function useStorage() {
           } : defaultConfig,
         };
 
+        console.log('📊 [LOAD] Dados carregados - categorias:', loadedData.categoriasProduto);
         setData(loadedData);
       } catch (error) {
         console.error('Erro ao carregar dados do Supabase:', error);
@@ -709,7 +739,7 @@ export function useStorage() {
     }));
   }, [user]);
 
-  // ========== CATEGORIAS DE CONTAS (VERSÃO ULTRA RÁPIDA) ==========
+  // ========== CATEGORIAS DE CONTAS ==========
   const addCategoriaConta = useCallback(async (categoria: Omit<CategoriaConta, 'id'>) => {
     if (!user) {
       toast.error('Usuário não logado');
@@ -749,15 +779,10 @@ export function useStorage() {
 
     console.log('🔄 Atualizando estado local com:', novaCategoria);
 
-    // ATUALIZAÇÃO IMEDIATA DO ESTADO
-    setData(prev => {
-      const novoEstado = {
-        ...prev,
-        categoriasConta: [...prev.categoriasConta, novaCategoria],
-      };
-      console.log('📊 Novo estado:', novoEstado.categoriasConta);
-      return novoEstado;
-    });
+    setData(prev => ({
+      ...prev,
+      categoriasConta: [...prev.categoriasConta, novaCategoria],
+    }));
 
     toast.success('Categoria adicionada com sucesso!');
     return novaCategoria;
@@ -825,7 +850,7 @@ export function useStorage() {
     toast.success('Categoria deletada!');
   }, [user]);
 
-  // ========== CATEGORIAS DE PRODUTOS (VERSÃO ULTRA RÁPIDA) ==========
+  // ========== CATEGORIAS DE PRODUTOS ==========
   const addCategoriaProduto = useCallback(async (categoria: Omit<CategoriaProduto, 'id'>) => {
     if (!user) {
       toast.error('Usuário não logado');
@@ -863,15 +888,10 @@ export function useStorage() {
 
     console.log('🔄 Atualizando estado local com:', novaCategoria);
 
-    // ATUALIZAÇÃO IMEDIATA DO ESTADO
-    setData(prev => {
-      const novoEstado = {
-        ...prev,
-        categoriasProduto: [...prev.categoriasProduto, novaCategoria],
-      };
-      console.log('📊 Novo estado:', novoEstado.categoriasProduto);
-      return novoEstado;
-    });
+    setData(prev => ({
+      ...prev,
+      categoriasProduto: [...prev.categoriasProduto, novaCategoria],
+    }));
 
     toast.success('Categoria adicionada com sucesso!');
     return novaCategoria;
