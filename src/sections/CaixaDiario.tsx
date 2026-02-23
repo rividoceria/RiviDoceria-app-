@@ -8,11 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency } from '@/lib/format';
-import type { TransacaoDiaria, FormaPagamento, TipoTransacao } from '@/types';
 import { useCalculations } from '@/hooks/useCalculations';
 import { format } from 'date-fns';
 import { useStorage } from '@/hooks/useStorage';
-import { toast } from 'sonner';
 
 export function CaixaDiario() {
   const { data, addTransacao, deleteTransacao } = useStorage();
@@ -22,10 +20,10 @@ export function CaixaDiario() {
   
   // Form states
   const [dataSelecionada, setDataSelecionada] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [tipoTransacao, setTipoTransacao] = useState<TipoTransacao>('receita');
+  const [tipoTransacao, setTipoTransacao] = useState<'receita' | 'despesa'>('receita');
   const [descricao, setDescricao] = useState('');
   const [valor, setValor] = useState('');
-  const [formaPagamento, setFormaPagamento] = useState<FormaPagamento>('dinheiro');
+  const [formaPagamento, setFormaPagamento] = useState<'dinheiro' | 'pix' | 'debito' | 'credito'>('dinheiro');
   const [categoriaId, setCategoriaId] = useState('');
 
   const { calcularTaxa, calcularValorLiquido } = useCalculations(data);
@@ -48,7 +46,7 @@ export function CaixaDiario() {
       if (!acc[t.formaPagamento]) acc[t.formaPagamento] = 0;
       acc[t.formaPagamento] += t.valor;
       return acc;
-    }, {} as Record<FormaPagamento, number>);
+    }, {} as Record<string, number>);
 
     return { totalReceitas, totalDespesas, saldo, receitasPorForma };
   }, [receitasDoDia, despesasDoDia]);
@@ -82,14 +80,14 @@ export function CaixaDiario() {
     await deleteTransacao(id);
   };
 
-  const formaPagamentoIcons: Record<FormaPagamento, React.ReactNode> = {
+  const formaPagamentoIcons: Record<string, React.ReactNode> = {
     dinheiro: <Banknote className="w-4 h-4" />,
     pix: <Smartphone className="w-4 h-4" />,
     debito: <CreditCard className="w-4 h-4" />,
     credito: <CreditCard className="w-4 h-4" />,
   };
 
-  const formaPagamentoLabels: Record<FormaPagamento, string> = {
+  const formaPagamentoLabels: Record<string, string> = {
     dinheiro: 'Dinheiro',
     pix: 'Pix',
     debito: 'Cartão Débito',
@@ -127,7 +125,7 @@ export function CaixaDiario() {
               
               <div>
                 <Label>Tipo</Label>
-                <Select value={tipoTransacao} onValueChange={(v) => setTipoTransacao(v as TipoTransacao)}>
+                <Select value={tipoTransacao} onValueChange={(v) => setTipoTransacao(v as 'receita' | 'despesa')}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -160,7 +158,7 @@ export function CaixaDiario() {
 
               <div>
                 <Label>Forma de Pagamento</Label>
-                <Select value={formaPagamento} onValueChange={(v) => setFormaPagamento(v as FormaPagamento)}>
+                <Select value={formaPagamento} onValueChange={(v) => setFormaPagamento(v as 'dinheiro' | 'pix' | 'debito' | 'credito')}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -266,7 +264,7 @@ export function CaixaDiario() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-3">
-              {(Object.entries(resumoDia.receitasPorForma) as [FormaPagamento, number][]).map(([forma, valor]) => (
+              {Object.entries(resumoDia.receitasPorForma).map(([forma, valor]) => (
                 <div key={forma} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg">
                   {formaPagamentoIcons[forma]}
                   <span className="text-sm font-medium">{formaPagamentoLabels[forma]}:</span>
