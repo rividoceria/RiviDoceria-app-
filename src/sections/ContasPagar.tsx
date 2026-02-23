@@ -11,7 +11,6 @@ import { ProgressBar } from '@/components/ui-custom/ProgressBar';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { format, parseISO, startOfMonth, endOfMonth } from 'date-fns';
 import { useStorage } from '@/hooks/useStorage';
-import { toast } from 'sonner';
 
 export function ContasPagar() {
   const { data, addContaPagar, updateContaPagar, deleteContaPagar } = useStorage();
@@ -41,7 +40,6 @@ export function ContasPagar() {
   const gastosPorCategoria = useMemo(() => {
     const gastos: Record<string, number> = {};
     
-    // Buscar despesas nas transações
     (data?.transacoes || [])
       .filter(t => t.tipo === 'despesa' && t.data.startsWith(mesSelecionado) && t.categoriaId)
       .forEach(t => {
