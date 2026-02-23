@@ -8,20 +8,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ProgressBar } from '@/components/ui-custom/ProgressBar';
 import { formatCurrency, formatDate } from '@/lib/format';
-import type { Meta, TipoMeta } from '@/types';
 import { differenceInMonths } from 'date-fns';
 import { useStorage } from '@/hooks/useStorage';
-import { toast } from 'sonner';
 
 export function Metas() {
   const { data, addMeta, updateMeta, deleteMeta } = useStorage();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isAddValorOpen, setIsAddValorOpen] = useState(false);
-  const [metaSelecionada, setMetaSelecionada] = useState<Meta | null>(null);
+  const [metaSelecionada, setMetaSelecionada] = useState<any | null>(null);
   
   // Form states
-  const [tipo, setTipo] = useState<TipoMeta>('faturamento');
+  const [tipo, setTipo] = useState('faturamento');
   const [nome, setNome] = useState('');
   const [valorMeta, setValorMeta] = useState('');
   const [dataInicio, setDataInicio] = useState(new Date().toISOString().split('T')[0]);
@@ -38,7 +36,7 @@ export function Metas() {
     if (!nome || !valorMeta || !dataInicio) return;
     
     await addMeta({
-      tipo,
+      tipo: tipo as any,
       nome,
       valorMeta: parseFloat(valorMeta),
       valorAcumulado: 0,
@@ -73,23 +71,23 @@ export function Metas() {
     await deleteMeta(id);
   };
 
-  const openAddValor = (meta: Meta) => {
+  const openAddValor = (meta: any) => {
     setMetaSelecionada(meta);
     setIsAddValorOpen(true);
   };
 
-  const calcularProgresso = (meta: Meta) => {
+  const calcularProgresso = (meta: any) => {
     return meta.valorMeta > 0 ? (meta.valorAcumulado / meta.valorMeta) * 100 : 0;
   };
 
-  const calcularMesesRestantes = (meta: Meta) => {
+  const calcularMesesRestantes = (meta: any) => {
     if (!meta.dataFim) return null;
     const hoje = new Date();
     const fim = new Date(meta.dataFim);
     return Math.max(0, differenceInMonths(fim, hoje));
   };
 
-  const MetaCard = ({ meta }: { meta: Meta }) => {
+  const MetaCard = ({ meta }: { meta: any }) => {
     const progresso = calcularProgresso(meta);
     const mesesRestantes = calcularMesesRestantes(meta);
     const falta = meta.valorMeta - meta.valorAcumulado;
@@ -199,7 +197,7 @@ export function Metas() {
             <div className="space-y-4 pt-4">
               <div>
                 <Label>Tipo de Meta</Label>
-                <Select value={tipo} onValueChange={(v) => setTipo(v as TipoMeta)}>
+                <Select value={tipo} onValueChange={setTipo}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
