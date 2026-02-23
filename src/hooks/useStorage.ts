@@ -536,11 +536,33 @@ export function useStorage() {
       );
     }
 
-    // 4. Atualizar estado local
+    // 4. Converter de volta para o formato do app
+    const fichaConvertida: FichaTecnica = {
+      id: fichaAtualizada.id,
+      nome: fichaAtualizada.nome,
+      tipo: fichaAtualizada.tipo,
+      categoriaId: fichaAtualizada.categoria_id,
+      descricao: fichaAtualizada.descricao,
+      rendimentoQuantidade: fichaAtualizada.rendimento_quantidade,
+      rendimentoUnidade: fichaAtualizada.rendimento_unidade,
+      custoTotal: fichaAtualizada.custo_total,
+      custoUnidade: fichaAtualizada.custo_unidade,
+      precoVenda: fichaAtualizada.preco_venda,
+      margemLucro: fichaAtualizada.margem_lucro,
+      cmvPercentual: fichaAtualizada.cmv_percentual,
+      validadeDias: fichaAtualizada.validade_dias,
+      itens: updates.itens || [],
+      itensEmbalagem: updates.itensEmbalagem || [],
+      receitasBaseIds: updates.receitasBaseIds || [],
+      createdAt: fichaAtualizada.created_at,
+      updatedAt: fichaAtualizada.updated_at,
+    };
+
+    // 5. Atualizar estado local
     setData(prev => ({
       ...prev,
       fichasTecnicas: prev.fichasTecnicas.map(f => 
-        f.id === id ? { ...f, ...updates } : f
+        f.id === id ? fichaConvertida : f
       ),
     }));
 
