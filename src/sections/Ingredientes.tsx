@@ -9,11 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertCard } from '@/components/ui-custom/AlertCard';
 import { formatCurrency, formatNumber } from '@/lib/format';
-import type { Ingrediente, UnidadeMedida } from '@/types';
 import { useStorage } from '@/hooks/useStorage';
-import { toast } from 'sonner';
 
-const unidadesMedida: { value: UnidadeMedida; label: string }[] = [
+const unidadesMedida = [
   { value: 'kg', label: 'Quilograma (kg)' },
   { value: 'g', label: 'Grama (g)' },
   { value: 'L', label: 'Litro (L)' },
@@ -33,7 +31,7 @@ export function Ingredientes() {
   // Form states
   const [nome, setNome] = useState('');
   const [quantidadeEmbalagem, setQuantidadeEmbalagem] = useState('');
-  const [unidade, setUnidade] = useState<UnidadeMedida>('kg');
+  const [unidade, setUnidade] = useState('kg');
   const [precoEmbalagem, setPrecoEmbalagem] = useState('');
   const [estoqueAtual, setEstoqueAtual] = useState('0');
   const [estoqueMinimo, setEstoqueMinimo] = useState('0');
@@ -55,7 +53,7 @@ export function Ingredientes() {
     const itemData = {
       nome,
       quantidadeEmbalagem: qtd,
-      unidade,
+      unidade: unidade as any,
       precoEmbalagem: preco,
       custoUnidade,
       estoqueAtual: parseFloat(estoqueAtual) || 0,
@@ -83,7 +81,7 @@ export function Ingredientes() {
     setEstoqueMinimo('0');
   };
 
-  const handleEdit = (item: Ingrediente) => {
+  const handleEdit = (item: any) => {
     setEditingId(item.id);
     setNome(item.nome);
     setQuantidadeEmbalagem(item.quantidadeEmbalagem.toString());
@@ -105,7 +103,7 @@ export function Ingredientes() {
     setIsDialogOpen(true);
   };
 
-  const ItemCard = ({ item }: { item: Ingrediente }) => {
+  const ItemCard = ({ item }: { item: any }) => {
     const estoqueCritico = (item.estoqueAtual || 0) <= (item.estoqueMinimo || 0);
     
     return (
@@ -218,7 +216,7 @@ export function Ingredientes() {
               </div>
               <div>
                 <Label>Unidade</Label>
-                <Select value={unidade} onValueChange={(v) => setUnidade(v as UnidadeMedida)}>
+                <Select value={unidade} onValueChange={setUnidade}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
