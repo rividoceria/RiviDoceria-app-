@@ -6,9 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { formatCurrency, formatPercentage } from '@/lib/format';
-import type { FichaTecnica } from '@/types';
 import { useStorage } from '@/hooks/useStorage';
-import { toast } from 'sonner';
 
 export function Precificacao() {
   const { data, updateFichaTecnica } = useStorage();
@@ -28,7 +26,7 @@ export function Precificacao() {
   const produtosPorCategoria = useMemo(() => {
     if (!categoriasProduto.length || !produtos.length) return [];
     
-    const grouped: Record<string, { categoria: typeof categoriasProduto[0]; produtos: typeof produtos }> = {};
+    const grouped: Record<string, { categoria: any; produtos: typeof produtos }> = {};
     
     produtos.forEach(produto => {
       if (!produto?.categoriaId) return;
