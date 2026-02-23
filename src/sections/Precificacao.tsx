@@ -6,87 +6,32 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { formatCurrency, formatPercentage } from '@/lib/format';
-import type { SistemaData, FichaTecnica } from '@/types';
+import type { FichaTecnica } from '@/types';
+import { useStorage } from '@/hooks/useStorage';
+import { toast } from 'sonner';
 
-interface PrecificacaoProps {
-  data: SistemaData;
-  onUpdateFicha: (id: string, updates: Partial<FichaTecnica>) => void;
-}
-
-export function Precificacao({ data, onUpdateFicha }: PrecificacaoProps) {
-  // LOGS PARA DEBUG
-  console.log('=== PRECIFICACAO RENDERIZANDO ===');
-  console.log('data recebida:', data);
-  console.log('categoriasProduto:', data?.categoriasProduto);
-  console.log('fichasTecnicas:', data?.fichasTecnicas);
-  console.log('tipo de categoriasProduto:', typeof data?.categoriasProduto);
-  console.log('é array?', Array.isArray(data?.categoriasProduto));
-
-  // Verificações de segurança para evitar tela branca
-  if (!data) {
-    console.error('❌ ERRO: data é undefined!');
-    return (
-      <div className="p-8 text-center">
-        <h3 className="text-xl font-bold text-red-600 mb-2">Erro: Dados não carregados</h3>
-        <p className="text-gray-600">data é undefined</p>
-      </div>
-    );
-  }
-
-  if (!data.categoriasProduto) {
-    console.error('❌ ERRO: categoriasProduto é undefined!');
-    return (
-      <div className="p-8 text-center">
-        <h3 className="text-xl font-bold text-red-600 mb-2">Erro: Categorias não carregadas</h3>
-        <p className="text-gray-600">categoriasProduto é undefined</p>
-      </div>
-    );
-  }
-
-  if (!Array.isArray(data.categoriasProduto)) {
-    console.error('❌ ERRO: categoriasProduto não é um array!', data.categoriasProduto);
-    return (
-      <div className="p-8 text-center">
-        <h3 className="text-xl font-bold text-red-600 mb-2">Erro: Formato de dados inválido</h3>
-        <p className="text-gray-600">categoriasProduto não é um array</p>
-      </div>
-    );
-  }
-
+export function Precificacao() {
+  const { data, updateFichaTecnica } = useStorage();
+  
   const [selectedFichaId, setSelectedFichaId] = useState<string>('');
   const [novoPreco, setNovoPreco] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  // Verificações de segurança para evitar tela branca
   const produtos = useMemo(() => {
-    const result = (data?.fichasTecnicas || []).filter(f => f?.tipo === 'produto_final');
-    console.log('produtos filtrados:', result.length, 'encontrados');
-    return result;
+    return (data?.fichasTecnicas || []).filter(f => f?.tipo === 'produto_final');
   }, [data?.fichasTecnicas]);
 
   const categoriasProduto = useMemo(() => {
-    const result = data?.categoriasProduto || [];
-    console.log('categoriasProduto (memo):', result.length, 'encontradas');
-    return result;
+    return data?.categoriasProduto || [];
   }, [data?.categoriasProduto]);
 
   const produtosPorCategoria = useMemo(() => {
-    console.log('Calculando produtosPorCategoria...');
-    console.log('categorias disponíveis:', categoriasProduto.length);
-    console.log('produtos disponíveis:', produtos.length);
-    
-    if (!categoriasProduto.length || !produtos.length) {
-      console.log('Sem dados suficientes para agrupar');
-      return [];
-    }
+    if (!categoriasProduto.length || !produtos.length) return [];
     
     const grouped: Record<string, { categoria: typeof categoriasProduto[0]; produtos: typeof produtos }> = {};
     
     produtos.forEach(produto => {
-      if (!produto?.categoriaId) {
-        console.log('Produto sem categoriaId:', produto?.nome);
-        return;
-      }
+      if (!produto?.categoriaId) return;
       
       const cat = categoriasProduto.find(c => c?.id === produto.categoriaId);
       if (cat) {
@@ -94,17 +39,13 @@ export function Precificacao({ data, onUpdateFicha }: PrecificacaoProps) {
           grouped[cat.id] = { categoria: cat, produtos: [] };
         }
         grouped[cat.id].produtos.push(produto);
-      } else {
-        console.log('Categoria não encontrada para produto:', produto.nome, 'categoriaId:', produto.categoriaId);
       }
     });
 
-    const result = Object.values(grouped);
-    console.log('produtosPorCategoria:', result.length, 'grupos criados');
-    return result;
+    return Object.values(grouped);
   }, [produtos, categoriasProduto]);
 
-  const handleAtualizarPreco = () => {
+  const handleAtualizarPreco = async () => {
     if (!selectedFichaId || !novoPreco) return;
     
     const preco = parseFloat(novoPreco);
@@ -114,7 +55,7 @@ export function Precificacao({ data, onUpdateFicha }: PrecificacaoProps) {
     const margemLucro = ficha.custoUnidade > 0 ? ((preco - ficha.custoUnidade) / preco) * 100 : 0;
     const cmvPercentual = ficha.custoUnidade > 0 ? (ficha.custoUnidade / preco) * 100 : 0;
 
-    onUpdateFicha(selectedFichaId, {
+    await updateFichaTecnica(selectedFichaId, {
       precoVenda: preco,
       margemLucro,
       cmvPercentual,
