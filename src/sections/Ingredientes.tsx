@@ -9,14 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertCard } from '@/components/ui-custom/AlertCard';
 import { formatCurrency, formatNumber } from '@/lib/format';
-import type { SistemaData, Ingrediente, UnidadeMedida } from '@/types';
-
-interface IngredientesProps {
-  data: SistemaData;
-  onAddIngrediente: (ingrediente: Omit<Ingrediente, 'id' | 'createdAt' | 'updatedAt'>) => void;
-  onUpdateIngrediente: (id: string, updates: Partial<Ingrediente>) => void;
-  onDeleteIngrediente: (id: string) => void;
-}
+import type { Ingrediente, UnidadeMedida } from '@/types';
+import { useStorage } from '@/hooks/useStorage';
+import { toast } from 'sonner';
 
 const unidadesMedida: { value: UnidadeMedida; label: string }[] = [
   { value: 'kg', label: 'Quilograma (kg)' },
@@ -28,7 +23,9 @@ const unidadesMedida: { value: UnidadeMedida; label: string }[] = [
   { value: 'm', label: 'Metro (m)' },
 ];
 
-export function Ingredientes({ data, onAddIngrediente, onUpdateIngrediente, onDeleteIngrediente }: IngredientesProps) {
+export function Ingredientes() {
+  const { data, addIngrediente, updateIngrediente, deleteIngrediente } = useStorage();
+  
   const [activeTab, setActiveTab] = useState('ingredientes');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -41,16 +38,16 @@ export function Ingredientes({ data, onAddIngrediente, onUpdateIngrediente, onDe
   const [estoqueAtual, setEstoqueAtual] = useState('0');
   const [estoqueMinimo, setEstoqueMinimo] = useState('0');
 
-  const ingredientes = data.ingredientes.filter(i => i.tipo === 'ingrediente');
-  const embalagens = data.ingredientes.filter(i => i.tipo === 'embalagem');
-  const estoqueBaixo = data.ingredientes.filter(i => i.estoqueAtual <= i.estoqueMinimo);
+  const ingredientes = (data?.ingredientes || []).filter(i => i.tipo === 'ingrediente');
+  const embalagens = (data?.ingredientes || []).filter(i => i.tipo === 'embalagem');
+  const estoqueBaixo = (data?.ingredientes || []).filter(i => i.estoqueAtual <= i.estoqueMinimo);
 
   const calcularCustoUnidade = (qtd: number, preco: number): number => {
     if (qtd <= 0 || preco <= 0) return 0;
     return preco / qtd;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const qtd = parseFloat(quantidadeEmbalagem);
     const preco = parseFloat(precoEmbalagem);
     const custoUnidade = calcularCustoUnidade(qtd, preco);
@@ -67,10 +64,10 @@ export function Ingredientes({ data, onAddIngrediente, onUpdateIngrediente, onDe
     };
 
     if (editingId) {
-      onUpdateIngrediente(editingId, itemData);
+      await updateIngrediente(editingId, itemData);
       setEditingId(null);
     } else {
-      onAddIngrediente(itemData);
+      await addIngrediente(itemData);
     }
     
     resetForm();
@@ -96,6 +93,10 @@ export function Ingredientes({ data, onAddIngrediente, onUpdateIngrediente, onDe
     setEstoqueMinimo(item.estoqueMinimo.toString());
     setActiveTab(item.tipo === 'ingrediente' ? 'ingredientes' : 'embalagens');
     setIsDialogOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    await deleteIngrediente(id);
   };
 
   const handleOpenNew = () => {
@@ -152,7 +153,7 @@ export function Ingredientes({ data, onAddIngrediente, onUpdateIngrediente, onDe
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                onClick={() => onDeleteIngrediente(item.id)}
+                onClick={() => handleDelete(item.id)}
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
