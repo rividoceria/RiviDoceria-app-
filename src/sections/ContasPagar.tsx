@@ -9,17 +9,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Switch } from '@/components/ui/switch';
 import { ProgressBar } from '@/components/ui-custom/ProgressBar';
 import { formatCurrency, formatDate } from '@/lib/format';
-import type { SistemaData, ContaPagar } from '@/types';
 import { format, parseISO, startOfMonth, endOfMonth } from 'date-fns';
+import { useStorage } from '@/hooks/useStorage';
+import { toast } from 'sonner';
 
-interface ContasPagarProps {
-  data: SistemaData;
-  onAddConta: (conta: Omit<ContaPagar, 'id' | 'createdAt'>) => void;
-  onUpdateConta: (id: string, updates: Partial<ContaPagar>) => void;
-  onDeleteConta: (id: string) => void;
-}
-
-export function ContasPagar({ data, onAddConta, onUpdateConta, onDeleteConta }: ContasPagarProps) {
+export function ContasPagar() {
+  const { data, addContaPagar, updateContaPagar, deleteContaPagar } = useStorage();
+  
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [mesSelecionado, setMesSelecionado] = useState(format(new Date(), 'yyyy-MM'));
   
@@ -34,39 +30,39 @@ export function ContasPagar({ data, onAddConta, onUpdateConta, onDeleteConta }: 
     const inicioMes = startOfMonth(parseISO(mesSelecionado + '-01'));
     const fimMes = endOfMonth(inicioMes);
     
-    return data.contasPagar.filter(c => {
-      const dataVenc = parseISO(c.dataVencimento);
-      return dataVenc >= inicioMes && dataVenc <= fimMes;
-    }).sort((a, b) => new Date(a.dataVencimento).getTime() - new Date(b.dataVencimento).getTime());
-  }, [data.contasPagar, mesSelecionado]);
+    return (data?.contasPagar || [])
+      .filter(c => {
+        const dataVenc = parseISO(c.dataVencimento);
+        return dataVenc >= inicioMes && dataVenc <= fimMes;
+      })
+      .sort((a, b) => new Date(a.dataVencimento).getTime() - new Date(b.dataVencimento).getTime());
+  }, [data?.contasPagar, mesSelecionado]);
 
   const gastosPorCategoria = useMemo(() => {
     const gastos: Record<string, number> = {};
     
     // Buscar despesas nas transações
-    data.transacoes
+    (data?.transacoes || [])
       .filter(t => t.tipo === 'despesa' && t.data.startsWith(mesSelecionado) && t.categoriaId)
       .forEach(t => {
         if (t.categoriaId) {
-          if (!gastos[t.categoriaId]) gastos[t.categoriaId] = 0;
-          gastos[t.categoriaId] += t.valor;
+          gastos[t.categoriaId] = (gastos[t.categoriaId] || 0) + t.valor;
         }
       });
 
-    data.contasPagar
+    (data?.contasPagar || [])
       .filter(c => c.dataVencimento.startsWith(mesSelecionado) && c.pago)
       .forEach(c => {
-        if (!gastos[c.categoriaId]) gastos[c.categoriaId] = 0;
-        gastos[c.categoriaId] += c.valor;
+        gastos[c.categoriaId] = (gastos[c.categoriaId] || 0) + c.valor;
       });
 
     return gastos;
-  }, [data.transacoes, data.contasPagar, mesSelecionado]);
+  }, [data?.transacoes, data?.contasPagar, mesSelecionado]);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!descricao || !categoriaId || !valor || !dataVencimento) return;
     
-    onAddConta({
+    await addContaPagar({
       descricao,
       categoriaId,
       valor: parseFloat(valor),
@@ -83,11 +79,15 @@ export function ContasPagar({ data, onAddConta, onUpdateConta, onDeleteConta }: 
     setIsDialogOpen(false);
   };
 
-  const handlePagar = (conta: ContaPagar) => {
-    onUpdateConta(conta.id, {
+  const handlePagar = async (conta: any) => {
+    await updateContaPagar(conta.id, {
       pago: !conta.pago,
       dataPagamento: !conta.pago ? format(new Date(), 'yyyy-MM-dd') : undefined,
     });
+  };
+
+  const handleDelete = async (id: string) => {
+    await deleteContaPagar(id);
   };
 
   const hoje = new Date();
@@ -127,7 +127,7 @@ export function ContasPagar({ data, onAddConta, onUpdateConta, onDeleteConta }: 
                     <SelectValue placeholder="Selecione uma categoria" />
                   </SelectTrigger>
                   <SelectContent>
-                    {data.categoriasConta.map((cat) => (
+                    {(data?.categoriasConta || []).map((cat) => (
                       <SelectItem key={cat.id} value={cat.id}>
                         {cat.nome}
                       </SelectItem>
@@ -184,7 +184,7 @@ export function ContasPagar({ data, onAddConta, onUpdateConta, onDeleteConta }: 
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {data.categoriasConta
+            {(data?.categoriasConta || [])
               .filter(cat => cat.limiteGasto && cat.limiteGasto > 0)
               .map((categoria) => {
                 const gasto = gastosPorCategoria[categoria.id] || 0;
@@ -195,7 +195,7 @@ export function ContasPagar({ data, onAddConta, onUpdateConta, onDeleteConta }: 
                     <div className="flex justify-between items-center">
                       <span className="font-medium text-gray-700">{categoria.nome}</span>
                       <span className={`text-sm font-semibold ${percentual > 100 ? 'text-red-600' : 'text-gray-600'}`}>
-                        {formatCurrency(gasto)} / {formatCurrency(categoria.limiteGasto || 0)}
+                        {formatCurrency(gasto)} / {formatCurrency(categoria.limiteGasto)}
                       </span>
                     </div>
                     <ProgressBar
@@ -209,7 +209,7 @@ export function ContasPagar({ data, onAddConta, onUpdateConta, onDeleteConta }: 
                 );
               })}
           </div>
-          {data.categoriasConta.filter(cat => cat.limiteGasto && cat.limiteGasto > 0).length === 0 && (
+          {(data?.categoriasConta || []).filter(cat => cat.limiteGasto && cat.limiteGasto > 0).length === 0 && (
             <p className="text-gray-500 text-center py-4">
               Nenhuma categoria com limite definido. Configure em Configurações &gt; Categorias.
             </p>
@@ -242,7 +242,7 @@ export function ContasPagar({ data, onAddConta, onUpdateConta, onDeleteConta }: 
           ) : (
             <div className="space-y-3">
               {contasFiltradas.map((conta) => {
-                const categoria = data.categoriasConta.find(c => c.id === conta.categoriaId);
+                const categoria = data?.categoriasConta?.find(c => c.id === conta.categoriaId);
                 const dataVenc = parseISO(conta.dataVencimento);
                 const vencida = !conta.pago && dataVenc < hoje;
                 const vencendoHoje = !conta.pago && format(dataVenc, 'yyyy-MM-dd') === format(hoje, 'yyyy-MM-dd');
@@ -294,7 +294,7 @@ export function ContasPagar({ data, onAddConta, onUpdateConta, onDeleteConta }: 
                         variant="ghost"
                         size="icon"
                         className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => onDeleteConta(conta.id)}
+                        onClick={() => handleDelete(conta.id)}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
