@@ -141,14 +141,6 @@ function MainApp() {
     deleteMeta,
   } = useStorage();
 
-  // LOGS PARA DEBUG
-  console.log('=== MAINAPP RENDER ===');
-  console.log('isLoaded:', isLoaded);
-  console.log('data:', data);
-  console.log('categoriasProduto:', data?.categoriasProduto);
-  console.log('fichasTecnicas:', data?.fichasTecnicas);
-  console.log('produtos finais:', data?.fichasTecnicas?.filter((f: any) => f?.tipo === 'produto_final'));
-
   if (!isLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
@@ -186,8 +178,6 @@ function MainApp() {
   };
 
   const renderModule = () => {
-    console.log('Renderizando módulo:', currentModule);
-    
     try {
       switch (currentModule) {
         case 'dashboard':
@@ -281,9 +271,7 @@ function MainApp() {
         case 'configuracoes':
           return (
             <ErrorBoundary key="configuracoes">
-              <ConfiguracoesSection
-                data={data}
-              />
+              <ConfiguracoesSection /> {/* ← NÃO PASSA MAIS A PROP DATA */}
             </ErrorBoundary>
           );
         default:
