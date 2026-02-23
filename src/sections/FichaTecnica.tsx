@@ -9,14 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { formatCurrency, formatNumber, formatPercentage } from '@/lib/format';
-import { useStorage } from '@/hooks/useStorage'; // ← ADICIONADO
-import type { SistemaData, FichaTecnica, ItemFichaTecnica, TipoProduto, UnidadeMedida } from '@/types';
-
-// Removido as props que não são mais necessárias
-interface FichaTecnicaProps {
-  data: SistemaData;
-  // As funções agora vêm do useStorage, não por props
-}
+import { useStorage } from '@/hooks/useStorage';
+import type { FichaTecnica, ItemFichaTecnica, TipoProduto, UnidadeMedida } from '@/types';
 
 const unidadesMedida: { value: UnidadeMedida; label: string }[] = [
   { value: 'kg', label: 'kg' },
@@ -26,13 +20,8 @@ const unidadesMedida: { value: UnidadeMedida; label: string }[] = [
   { value: 'un', label: 'un' },
 ];
 
-export function FichaTecnicaSection({ data }: FichaTecnicaProps) {
-  // Usar o hook useStorage para acessar as funções
-  const { 
-    addFichaTecnica, 
-    updateFichaTecnica, 
-    deleteFichaTecnica 
-  } = useStorage();
+export function FichaTecnicaSection() {
+  const { data, addFichaTecnica, updateFichaTecnica, deleteFichaTecnica } = useStorage();
 
   const [activeTab, setActiveTab] = useState('receitas');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -58,7 +47,6 @@ export function FichaTecnicaSection({ data }: FichaTecnicaProps) {
   const [unidadeItem, setUnidadeItem] = useState<UnidadeMedida>('g');
   const [itemType, setItemType] = useState<'ingrediente' | 'embalagem'>('ingrediente');
 
-  // Garantir que os arrays existam com proteção máxima
   const fichasTecnicas = useMemo(() => data?.fichasTecnicas || [], [data?.fichasTecnicas]);
   const ingredientes = useMemo(() => data?.ingredientes || [], [data?.ingredientes]);
   const categoriasProduto = useMemo(() => data?.categoriasProduto || [], [data?.categoriasProduto]);
@@ -73,11 +61,10 @@ export function FichaTecnicaSection({ data }: FichaTecnicaProps) {
     [fichasTecnicas]
   );
 
-  // Calcular custo total incluindo receitas base selecionadas
+  // Calcular custo total
   const custoTotal = useMemo(() => {
     let custo = 0;
     
-    // Custo das receitas base selecionadas (múltiplas)
     if (receitasBaseIds && receitasBaseIds.length > 0) {
       receitasBaseIds.forEach(id => {
         const receitaBase = fichasTecnicas.find(f => f?.id === id);
@@ -87,7 +74,6 @@ export function FichaTecnicaSection({ data }: FichaTecnicaProps) {
       });
     }
     
-    // Custo dos ingredientes adicionais
     custo += (itens || []).reduce((acc, item) => {
       if (!item) return acc;
       const ingrediente = ingredientes.find(i => i?.id === item.ingredienteId);
@@ -97,7 +83,6 @@ export function FichaTecnicaSection({ data }: FichaTecnicaProps) {
       return acc;
     }, 0);
     
-    // Custo das embalagens
     custo += (itensEmbalagem || []).reduce((acc, item) => {
       if (!item) return acc;
       const ingrediente = ingredientes.find(i => i?.id === item.ingredienteId);
@@ -127,7 +112,6 @@ export function FichaTecnicaSection({ data }: FichaTecnicaProps) {
     return (custoUnidade / preco) * 100;
   }, [precoVenda, custoUnidade]);
 
-  // Custo total das receitas base selecionadas
   const custoReceitasBase = useMemo(() => {
     if (!receitasBaseIds || receitasBaseIds.length === 0) return 0;
     return receitasBaseIds.reduce((total, id) => {
@@ -168,7 +152,6 @@ export function FichaTecnicaSection({ data }: FichaTecnicaProps) {
     }
   };
 
-  // Adicionar ou remover receita base
   const toggleReceitaBase = (receitaId: string) => {
     if (receitasBaseIds.includes(receitaId)) {
       setReceitasBaseIds(prev => prev.filter(id => id !== receitaId));
@@ -181,7 +164,7 @@ export function FichaTecnicaSection({ data }: FichaTecnicaProps) {
     setReceitasBaseIds(prev => prev.filter(id => id !== receitaId));
   };
 
-  const handleSubmit = async () => { // ← TORNADO ASYNC
+  const handleSubmit = async () => {
     if (!nome || !categoriaId || !rendimentoQuantidade) return;
 
     const fichaData = {
@@ -203,11 +186,9 @@ export function FichaTecnicaSection({ data }: FichaTecnicaProps) {
     };
 
     if (editingId) {
-      // Usar a função do useStorage
       await updateFichaTecnica(editingId, fichaData);
       setEditingId(null);
     } else {
-      // Usar a função do useStorage
       await addFichaTecnica(fichaData);
     }
     
@@ -247,7 +228,7 @@ export function FichaTecnicaSection({ data }: FichaTecnicaProps) {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = async (id: string) => { // ← TORNADO ASYNC
+  const handleDelete = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir esta ficha técnica?')) {
       await deleteFichaTecnica(id);
     }
@@ -285,7 +266,6 @@ export function FichaTecnicaSection({ data }: FichaTecnicaProps) {
                   </span>
                 )}
               </div>
-              {/* Mostrar múltiplas receitas base */}
               {receitasBaseVinculadas.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1">
                   {receitasBaseVinculadas.map((receita, idx) => (
@@ -345,7 +325,6 @@ export function FichaTecnicaSection({ data }: FichaTecnicaProps) {
     );
   };
 
-  // Verificar se há categorias cadastradas
   const temCategorias = categoriasProduto.length > 0;
 
   return (
@@ -389,7 +368,6 @@ export function FichaTecnicaSection({ data }: FichaTecnicaProps) {
                 </div>
               </div>
               
-              {/* Receitas Base (múltiplas) */}
               {(viewingFicha.receitasBaseIds || []).length > 0 && (
                 <div className="p-3 bg-blue-50 rounded-lg">
                   <p className="text-sm text-blue-600 font-medium mb-2">
@@ -408,7 +386,6 @@ export function FichaTecnicaSection({ data }: FichaTecnicaProps) {
                 </div>
               )}
               
-              {/* Ingredientes */}
               {(viewingFicha.itens || []).length > 0 && (
                 <div>
                   <h4 className="font-medium text-gray-700 mb-2">Ingredientes Adicionais</h4>
@@ -429,7 +406,6 @@ export function FichaTecnicaSection({ data }: FichaTecnicaProps) {
                 </div>
               )}
               
-              {/* Embalagens */}
               {(viewingFicha.itensEmbalagem || []).length > 0 && (
                 <div>
                   <h4 className="font-medium text-gray-700 mb-2 flex items-center gap-2">
@@ -539,7 +515,6 @@ export function FichaTecnicaSection({ data }: FichaTecnicaProps) {
               <div className="space-y-2">
                 <Label>Receitas Base (opcional)</Label>
                 <div className="border rounded-lg p-3 space-y-3">
-                  {/* Receitas selecionadas (chips) */}
                   {receitasBaseIds.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {receitasBaseIds.map((id) => {
@@ -562,7 +537,6 @@ export function FichaTecnicaSection({ data }: FichaTecnicaProps) {
                     </div>
                   )}
                   
-                  {/* Lista de receitas disponíveis */}
                   <div className="max-h-40 overflow-y-auto space-y-1">
                     {receitasBase.length === 0 ? (
                       <p className="text-sm text-gray-500 text-center py-2">
@@ -600,7 +574,6 @@ export function FichaTecnicaSection({ data }: FichaTecnicaProps) {
                     )}
                   </div>
                   
-                  {/* Custo total das receitas selecionadas */}
                   {receitasBaseIds.length > 0 && (
                     <div className="pt-2 border-t text-sm text-gray-600">
                       Custo total das receitas base: 
