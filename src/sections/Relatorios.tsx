@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency } from '@/lib/format';
 import { useCalculations } from '@/hooks/useCalculations';
-import { format, parseISO, subMonths, eachMonthOfInterval, endOfMonth, startOfMonth } from 'date-fns';
+import { format, parseISO, subMonths, eachMonthOfInterval, endOfMonth, startOfMonth, subDays, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart as RePieChart, Pie, Cell } from 'recharts';
 import { useStorage } from '@/hooks/useStorage';
@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 
 const COLORS = ['#f472b6', '#60a5fa', '#34d399', '#fbbf24', '#a78bfa', '#f87171', '#22d3ee', '#fb923c'];
 
-type PeriodoType = 'mes' | 'trimestre' | 'semestre' | 'ano' | 'personalizado';
+type PeriodoType = 'hoje' | '7dias' | 'mes' | 'ano' | 'personalizado';
 
 export function Relatorios() {
   const { data } = useStorage();
@@ -26,6 +26,8 @@ export function Relatorios() {
   const [dataInicio, setDataInicio] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
   const [dataFim, setDataFim] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
   const [mostrarFiltrosPersonalizados, setMostrarFiltrosPersonalizados] = useState(false);
+  const [dataInicioDisplay, setDataInicioDisplay] = useState(format(startOfMonth(new Date()), 'dd/MM/yyyy'));
+  const [dataFimDisplay, setDataFimDisplay] = useState(format(endOfMonth(new Date()), 'dd/MM/yyyy'));
   
   const [activeTab, setActiveTab] = useState('evolucao');
 
@@ -78,29 +80,48 @@ export function Relatorios() {
     const hoje = new Date();
     
     switch(periodo) {
+      case 'hoje':
+        setDataInicio(format(startOfDay(hoje), 'yyyy-MM-dd'));
+        setDataFim(format(endOfDay(hoje), 'yyyy-MM-dd'));
+        setDataInicioDisplay(format(hoje, 'dd/MM/yyyy'));
+        setDataFimDisplay(format(hoje, 'dd/MM/yyyy'));
+        setMostrarFiltrosPersonalizados(false);
+        break;
+      case '7dias':
+        setDataInicio(format(startOfDay(subDays(hoje, 6)), 'yyyy-MM-dd'));
+        setDataFim(format(endOfDay(hoje), 'yyyy-MM-dd'));
+        setDataInicioDisplay(format(subDays(hoje, 6), 'dd/MM/yyyy'));
+        setDataFimDisplay(format(hoje, 'dd/MM/yyyy'));
+        setMostrarFiltrosPersonalizados(false);
+        break;
       case 'mes':
         setDataInicio(format(startOfMonth(hoje), 'yyyy-MM-dd'));
         setDataFim(format(endOfMonth(hoje), 'yyyy-MM-dd'));
-        setMostrarFiltrosPersonalizados(false);
-        break;
-      case 'trimestre':
-        setDataInicio(format(startOfMonth(subMonths(hoje, 2)), 'yyyy-MM-dd'));
-        setDataFim(format(endOfMonth(hoje), 'yyyy-MM-dd'));
-        setMostrarFiltrosPersonalizados(false);
-        break;
-      case 'semestre':
-        setDataInicio(format(startOfMonth(subMonths(hoje, 5)), 'yyyy-MM-dd'));
-        setDataFim(format(endOfMonth(hoje), 'yyyy-MM-dd'));
+        setDataInicioDisplay(format(startOfMonth(hoje), 'dd/MM/yyyy'));
+        setDataFimDisplay(format(endOfMonth(hoje), 'dd/MM/yyyy'));
         setMostrarFiltrosPersonalizados(false);
         break;
       case 'ano':
-        setDataInicio(format(startOfMonth(subMonths(hoje, 11)), 'yyyy-MM-dd'));
-        setDataFim(format(endOfMonth(hoje), 'yyyy-MM-dd'));
+        const inicioAno = new Date(hoje.getFullYear(), 0, 1);
+        const fimAno = new Date(hoje.getFullYear(), 11, 31);
+        setDataInicio(format(inicioAno, 'yyyy-MM-dd'));
+        setDataFim(format(fimAno, 'yyyy-MM-dd'));
+        setDataInicioDisplay(format(inicioAno, 'dd/MM/yyyy'));
+        setDataFimDisplay(format(fimAno, 'dd/MM/yyyy'));
         setMostrarFiltrosPersonalizados(false);
         break;
       case 'personalizado':
         setMostrarFiltrosPersonalizados(true);
         break;
+    }
+  };
+
+  // Atualizar datas personalizadas
+  const aplicarFiltroPersonalizado = () => {
+    if (dataInicio && dataFim) {
+      setDataInicioDisplay(format(parseISO(dataInicio), 'dd/MM/yyyy'));
+      setDataFimDisplay(format(parseISO(dataFim), 'dd/MM/yyyy'));
+      setMostrarFiltrosPersonalizados(false);
     }
   };
 
@@ -190,41 +211,19 @@ export function Relatorios() {
           const cat = data?.categoriasConta?.find(c => c?.id === t.categoriaId);
           if (cat) {
             if (!categorias[cat.id]) {
-              categorias[cat.id] = { nome: cat.nome, valor: 0, cor: cat.cor };
+              categorias[cat.id] = { nome: cat.nome, valor: 0, cor: cat.cor || COLORS[Object.keys(categorias).length % COLORS.length] };
             }
             categorias[cat.id].valor += t.valor || 0;
           }
         }
       });
 
-      // Adicionar custos fixos configurados (rateados por dia no período)
-      const diasNoPeriodo = Math.ceil((parseISO(dataFim).getTime() - parseISO(dataInicio).getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      const custosFixos = (data?.configuracoes?.custosFixos || []).reduce((acc: number, c: any) => acc + (c?.valor || 0), 0);
-      if (custosFixos > 0) {
-        const valorRateado = (custosFixos / 30) * Math.ceil(diasNoPeriodo / 30);
-        categorias['custos_fixos'] = { 
-          nome: 'Custos Fixos', 
-          valor: valorRateado, 
-          cor: '#ef4444' 
-        };
-      }
-
-      const custosVariaveis = (data?.configuracoes?.custosVariaveis || []).reduce((acc: number, c: any) => acc + (c?.valor || 0), 0);
-      if (custosVariaveis > 0) {
-        const valorRateado = (custosVariaveis / 30) * Math.ceil(diasNoPeriodo / 30);
-        categorias['custos_variaveis'] = { 
-          nome: 'Custos Variáveis', 
-          valor: valorRateado, 
-          cor: '#f97316' 
-        };
-      }
-
       return Object.values(categorias).sort((a, b) => b.valor - a.valor);
     } catch (error) {
       console.error('Erro ao calcular despesas por categoria:', error);
       return [];
     }
-  }, [data?.transacoes, data?.categoriasConta, data?.configuracoes, dataInicio, dataFim]);
+  }, [data?.transacoes, data?.categoriasConta, dataInicio, dataFim]);
 
   // Totais do período
   const totais = useMemo(() => {
@@ -281,7 +280,7 @@ export function Relatorios() {
     });
   }, [dadosMensais, data?.transacoes, dataInicio, dataFim]);
 
-  // Exportar relatório em JSON (simples)
+  // Exportar relatório em JSON
   const handleExportJSON = () => {
     try {
       const relatorio = {
@@ -315,8 +314,11 @@ export function Relatorios() {
 
   const limparFiltros = () => {
     setPeriodoSelecionado('mes');
-    setDataInicio(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
-    setDataFim(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
+    const hoje = new Date();
+    setDataInicio(format(startOfMonth(hoje), 'yyyy-MM-dd'));
+    setDataFim(format(endOfMonth(hoje), 'yyyy-MM-dd'));
+    setDataInicioDisplay(format(startOfMonth(hoje), 'dd/MM/yyyy'));
+    setDataFimDisplay(format(endOfMonth(hoje), 'dd/MM/yyyy'));
     setMostrarFiltrosPersonalizados(false);
   };
 
@@ -336,57 +338,103 @@ export function Relatorios() {
         </div>
       </div>
 
-      {/* Filtros */}
+      {/* Filtros - IGUAL À IMAGEM */}
       <Card>
         <CardContent className="p-4">
           <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-gray-500" />
-              <span className="font-medium">Período</span>
+            {/* Botões de período rápido */}
+            <div className="flex flex-wrap gap-2">
+              <Button 
+                variant={periodoSelecionado === 'hoje' ? 'default' : 'outline'} 
+                size="sm"
+                onClick={() => atualizarPeriodo('hoje')}
+                className={periodoSelecionado === 'hoje' ? 'bg-pink-500 hover:bg-pink-600' : ''}
+              >
+                Hoje
+              </Button>
+              <Button 
+                variant={periodoSelecionado === '7dias' ? 'default' : 'outline'} 
+                size="sm"
+                onClick={() => atualizarPeriodo('7dias')}
+                className={periodoSelecionado === '7dias' ? 'bg-pink-500 hover:bg-pink-600' : ''}
+              >
+                7 dias atrás
+              </Button>
+              <Button 
+                variant={periodoSelecionado === 'mes' ? 'default' : 'outline'} 
+                size="sm"
+                onClick={() => atualizarPeriodo('mes')}
+                className={periodoSelecionado === 'mes' ? 'bg-pink-500 hover:bg-pink-600' : ''}
+              >
+                Esse mês
+              </Button>
+              <Button 
+                variant={periodoSelecionado === 'ano' ? 'default' : 'outline'} 
+                size="sm"
+                onClick={() => atualizarPeriodo('ano')}
+                className={periodoSelecionado === 'ano' ? 'bg-pink-500 hover:bg-pink-600' : ''}
+              >
+                Esse ano
+              </Button>
             </div>
-            
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Select value={periodoSelecionado} onValueChange={(v: PeriodoType) => atualizarPeriodo(v)}>
-                <SelectTrigger className="w-full sm:w-48">
-                  <SelectValue placeholder="Selecionar período" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="mes">Este mês</SelectItem>
-                  <SelectItem value="trimestre">Últimos 3 meses</SelectItem>
-                  <SelectItem value="semestre">Últimos 6 meses</SelectItem>
-                  <SelectItem value="ano">Últimos 12 meses</SelectItem>
-                  <SelectItem value="personalizado">Personalizado</SelectItem>
-                </SelectContent>
-              </Select>
 
-              {mostrarFiltrosPersonalizados && (
-                <div className="flex flex-col sm:flex-row gap-2 flex-1">
-                  <div className="flex-1">
-                    <Label className="text-xs">Data Início</Label>
-                    <Input
-                      type="date"
-                      value={dataInicio}
-                      onChange={(e) => setDataInicio(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <Label className="text-xs">Data Fim</Label>
-                    <Input
-                      type="date"
-                      value={dataFim}
-                      onChange={(e) => setDataFim(e.target.value)}
-                    />
-                  </div>
+            {/* Display do período selecionado */}
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Calendar className="w-4 h-4 text-gray-500" />
+              <span>{dataInicioDisplay} - {dataFimDisplay}</span>
+            </div>
+
+            {/* Filtros personalizados (dropdown) */}
+            {mostrarFiltrosPersonalizados && (
+              <div className="flex flex-col sm:flex-row gap-2 p-3 bg-gray-50 rounded-lg">
+                <div className="flex-1">
+                  <Label className="text-xs">Data Início</Label>
+                  <Input
+                    type="date"
+                    value={dataInicio}
+                    onChange={(e) => setDataInicio(e.target.value)}
+                  />
                 </div>
-              )}
-            </div>
+                <div className="flex-1">
+                  <Label className="text-xs">Data Fim</Label>
+                  <Input
+                    type="date"
+                    value={dataFim}
+                    onChange={(e) => setDataFim(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-end gap-1">
+                  <Button size="sm" onClick={aplicarFiltroPersonalizado}>
+                    <Filter className="w-4 h-4 mr-1" />
+                    Aplicar
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setMostrarFiltrosPersonalizados(false)}>
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
 
+            {/* Botões de ação */}
             <div className="flex justify-end gap-2">
               <Button variant="ghost" size="sm" onClick={limparFiltros}>
                 <X className="w-4 h-4 mr-1" />
                 Limpar filtro
               </Button>
-              <Button size="sm" className="bg-gradient-to-r from-pink-500 to-rose-500">
+              <Button 
+                size="sm" 
+                className="bg-gradient-to-r from-pink-500 to-rose-500"
+                onClick={() => {
+                  if (periodoSelecionado === 'personalizado' && mostrarFiltrosPersonalizados) {
+                    aplicarFiltroPersonalizado();
+                  } else {
+                    // Recarrega os dados com o período atual
+                    setDataInicioDisplay(format(parseISO(dataInicio), 'dd/MM/yyyy'));
+                    setDataFimDisplay(format(parseISO(dataFim), 'dd/MM/yyyy'));
+                    toast.success('Dados atualizados!');
+                  }
+                }}
+              >
                 <Filter className="w-4 h-4 mr-1" />
                 Atualizar
               </Button>
@@ -424,22 +472,22 @@ export function Relatorios() {
         
         <Card className="bg-gradient-to-br from-purple-50 to-violet-50">
           <CardContent className="p-4">
-            <p className="text-sm text-purple-600 font-medium">CMV Total</p>
-            <p className="text-2xl font-bold text-purple-700">{formatCurrency(totais.cmv)}</p>
+            <p className="text-sm text-purple-600 font-medium">Total de Vendas</p>
+            <p className="text-2xl font-bold text-purple-700">{fluxoCaixa?.entradas ? formatCurrency(fluxoCaixa.entradas) : 'R$ 0,00'}</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Cards adicionais para fluxo de caixa */}
+      {/* Cards adicionais */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-green-500" />
-                <span className="font-medium">Total de Vendas</span>
+                <span className="font-medium">Total de Despesas</span>
               </div>
-              <span className="text-2xl font-bold text-green-600">{fluxoCaixa?.entradas ? formatCurrency(fluxoCaixa.entradas) : 'R$ 0,00'}</span>
+              <span className="text-2xl font-bold text-red-600">{fluxoCaixa?.saidas ? formatCurrency(fluxoCaixa.saidas) : 'R$ 0,00'}</span>
             </div>
           </CardContent>
         </Card>
@@ -448,10 +496,10 @@ export function Relatorios() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Receipt className="w-5 h-5 text-red-500" />
-                <span className="font-medium">Total de Despesas</span>
+                <Receipt className="w-5 h-5 text-blue-500" />
+                <span className="font-medium">Quantidade de Vendas</span>
               </div>
-              <span className="text-2xl font-bold text-red-600">{fluxoCaixa?.saidas ? formatCurrency(fluxoCaixa.saidas) : 'R$ 0,00'}</span>
+              <span className="text-2xl font-bold text-blue-600">{totais.qtdVendas || 0}</span>
             </div>
           </CardContent>
         </Card>
@@ -496,8 +544,8 @@ export function Relatorios() {
                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
                       />
                       <Bar dataKey="faturamento" name="Faturamento" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="lucro" name="Lucro" fill="#10b981" radius={[4, 4, 0, 0]} />
                       <Bar dataKey="despesas" name="Despesas" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="lucro" name="Lucro" fill="#10b981" radius={[4, 4, 0, 0]} />
                       <Legend />
                     </BarChart>
                   </ResponsiveContainer>
