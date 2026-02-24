@@ -12,8 +12,6 @@ import { format, parseISO, subMonths, eachMonthOfInterval, endOfMonth, startOfMo
 import { ptBR } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart as RePieChart, Pie, Cell } from 'recharts';
 import { useStorage } from '@/hooks/useStorage';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { toast } from 'sonner';
 
 const COLORS = ['#f472b6', '#60a5fa', '#34d399', '#fbbf24', '#a78bfa', '#f87171', '#22d3ee', '#fb923c'];
@@ -31,7 +29,48 @@ export function Relatorios() {
   
   const [activeTab, setActiveTab] = useState('evolucao');
 
-  const { resultadoMensal, calcularFluxoCaixa } = useCalculations(data);
+  const { resultadoMensal } = useCalculations(data);
+
+  // Função para calcular fluxo de caixa manualmente
+  const calcularFluxoCaixa = (inicio: Date, fim: Date) => {
+    const transacoes = data?.transacoes?.filter(t => {
+      if (!t?.data) return false;
+      const dataTransacao = new Date(t.data);
+      return dataTransacao >= inicio && dataTransacao <= fim;
+    }) || [];
+
+    const entradas = transacoes
+      .filter(t => t.tipo === 'receita')
+      .reduce((acc, t) => acc + (t.valor || 0), 0);
+
+    const saidas = transacoes
+      .filter(t => t.tipo === 'despesa')
+      .reduce((acc, t) => acc + (t.valor || 0), 0);
+
+    const detalhamento = [
+      ...transacoes
+        .filter(t => t.tipo === 'receita')
+        .map(t => ({
+          descricao: t.descricao || 'Venda',
+          valor: t.valor || 0,
+          tipo: 'entrada' as const
+        })),
+      ...transacoes
+        .filter(t => t.tipo === 'despesa')
+        .map(t => ({
+          descricao: t.descricao || 'Despesa',
+          valor: t.valor || 0,
+          tipo: 'saida' as const
+        }))
+    ];
+
+    return {
+      entradas,
+      saidas,
+      saldo: entradas - saidas,
+      detalhamento
+    };
+  };
 
   // Atualizar datas com base no período selecionado
   const atualizarPeriodo = (periodo: PeriodoType) => {
@@ -130,7 +169,7 @@ export function Relatorios() {
   // Fluxo de caixa
   const fluxoCaixa = useMemo(() => {
     return calcularFluxoCaixa(parseISO(dataInicio), parseISO(dataFim));
-  }, [dataInicio, dataFim, calcularFluxoCaixa]);
+  }, [dataInicio, dataFim, data?.transacoes]);
 
   // Despesas por categoria
   const despesasPorCategoria = useMemo(() => {
@@ -158,11 +197,11 @@ export function Relatorios() {
         }
       });
 
-      // Adicionar custos fixos configurados (rateados por mês)
-      const mesesNoPeriodo = dadosMensais.length || 1;
+      // Adicionar custos fixos configurados (rateados por dia no período)
+      const diasNoPeriodo = Math.ceil((parseISO(dataFim).getTime() - parseISO(dataInicio).getTime()) / (1000 * 60 * 60 * 24)) + 1;
       const custosFixos = (data?.configuracoes?.custosFixos || []).reduce((acc: number, c: any) => acc + (c?.valor || 0), 0);
       if (custosFixos > 0) {
-        const valorRateado = (custosFixos / 30) * Math.ceil((parseISO(dataFim).getTime() - parseISO(dataInicio).getTime()) / (1000 * 60 * 60 * 24));
+        const valorRateado = (custosFixos / 30) * Math.ceil(diasNoPeriodo / 30);
         categorias['custos_fixos'] = { 
           nome: 'Custos Fixos', 
           valor: valorRateado, 
@@ -172,7 +211,7 @@ export function Relatorios() {
 
       const custosVariaveis = (data?.configuracoes?.custosVariaveis || []).reduce((acc: number, c: any) => acc + (c?.valor || 0), 0);
       if (custosVariaveis > 0) {
-        const valorRateado = (custosVariaveis / 30) * Math.ceil((parseISO(dataFim).getTime() - parseISO(dataInicio).getTime()) / (1000 * 60 * 60 * 24));
+        const valorRateado = (custosVariaveis / 30) * Math.ceil(diasNoPeriodo / 30);
         categorias['custos_variaveis'] = { 
           nome: 'Custos Variáveis', 
           valor: valorRateado, 
@@ -185,7 +224,7 @@ export function Relatorios() {
       console.error('Erro ao calcular despesas por categoria:', error);
       return [];
     }
-  }, [data?.transacoes, data?.categoriasConta, data?.configuracoes, dataInicio, dataFim, dadosMensais.length]);
+  }, [data?.transacoes, data?.categoriasConta, data?.configuracoes, dataInicio, dataFim]);
 
   // Totais do período
   const totais = useMemo(() => {
@@ -242,53 +281,34 @@ export function Relatorios() {
     });
   }, [dadosMensais, data?.transacoes, dataInicio, dataFim]);
 
-  // Exportar relatório em PDF
-  const handleExportPDF = () => {
+  // Exportar relatório em JSON (simples)
+  const handleExportJSON = () => {
     try {
-      const doc = new jsPDF();
+      const relatorio = {
+        periodo: {
+          inicio: dataInicio,
+          fim: dataFim
+        },
+        totais,
+        despesasPorCategoria,
+        dadosMensais,
+        fluxoCaixa,
+        exportadoEm: new Date().toISOString()
+      };
       
-      // Título
-      doc.setFontSize(18);
-      doc.text('Relatório Financeiro', 14, 22);
+      const blob = new Blob([JSON.stringify(relatorio, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `relatorio_${format(new Date(), 'yyyyMMdd_HHmmss')}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
       
-      // Período
-      doc.setFontSize(11);
-      doc.text(`Período: ${format(parseISO(dataInicio), 'dd/MM/yyyy')} a ${format(parseISO(dataFim), 'dd/MM/yyyy')}`, 14, 32);
-      
-      // Totais
-      doc.setFontSize(12);
-      doc.text('Resumo do Período', 14, 45);
-      
-      autoTable(doc, {
-        startY: 50,
-        head: [['Indicador', 'Valor']],
-        body: [
-          ['Faturamento Total', formatCurrency(totais.faturamento)],
-          ['Despesas Totais', formatCurrency(totais.despesas)],
-          ['Saldo', formatCurrency(totais.saldo)],
-          ['CMV Total', formatCurrency(totais.cmv)],
-          ['Custos Fixos', formatCurrency(totais.custosFixos)],
-          ['Custos Variáveis', formatCurrency(totais.custosVariaveis)],
-        ],
-      });
-      
-      // Despesas por categoria
-      if (despesasPorCategoria.length > 0) {
-        const finalY = (doc as any).lastAutoTable.finalY || 100;
-        doc.text('Despesas por Categoria', 14, finalY + 15);
-        
-        autoTable(doc, {
-          startY: finalY + 20,
-          head: [['Categoria', 'Valor']],
-          body: despesasPorCategoria.map(cat => [cat.nome, formatCurrency(cat.valor)]),
-        });
-      }
-      
-      // Salvar PDF
-      doc.save(`relatorio_${format(new Date(), 'yyyyMMdd')}.pdf`);
       toast.success('Relatório exportado com sucesso!');
     } catch (error) {
-      console.error('Erro ao exportar PDF:', error);
+      console.error('Erro ao exportar relatório:', error);
       toast.error('Erro ao exportar relatório');
     }
   };
@@ -309,9 +329,9 @@ export function Relatorios() {
           <p className="text-gray-500">Análise financeira completa</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExportPDF}>
+          <Button variant="outline" onClick={handleExportJSON}>
             <Download className="w-4 h-4 mr-2" />
-            Exportar PDF
+            Exportar JSON
           </Button>
         </div>
       </div>
@@ -419,7 +439,7 @@ export function Relatorios() {
                 <CreditCard className="w-5 h-5 text-green-500" />
                 <span className="font-medium">Total de Vendas</span>
               </div>
-              <span className="text-2xl font-bold text-green-600">{fluxoCaixa?.totalVendas || 0}</span>
+              <span className="text-2xl font-bold text-green-600">{fluxoCaixa?.entradas ? formatCurrency(fluxoCaixa.entradas) : 'R$ 0,00'}</span>
             </div>
           </CardContent>
         </Card>
@@ -431,7 +451,7 @@ export function Relatorios() {
                 <Receipt className="w-5 h-5 text-red-500" />
                 <span className="font-medium">Total de Despesas</span>
               </div>
-              <span className="text-2xl font-bold text-red-600">{fluxoCaixa?.totalDespesas || 0}</span>
+              <span className="text-2xl font-bold text-red-600">{fluxoCaixa?.saidas ? formatCurrency(fluxoCaixa.saidas) : 'R$ 0,00'}</span>
             </div>
           </CardContent>
         </Card>
@@ -609,11 +629,11 @@ export function Relatorios() {
                   </div>
 
                   <div className="border-t pt-4">
-                    <h4 className="font-medium mb-2">Detalhamento</h4>
-                    <div className="space-y-2">
-                      {fluxoCaixa.detalhamento?.map((item, idx) => (
+                    <h4 className="font-medium mb-2">Últimas Transações</h4>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {fluxoCaixa.detalhamento?.slice(0, 10).map((item, idx) => (
                         <div key={idx} className="flex justify-between p-2 bg-gray-50 rounded">
-                          <span>{item.descricao}</span>
+                          <span>{item.descricao || 'Transação'}</span>
                           <span className={item.tipo === 'entrada' ? 'text-green-600' : 'text-red-600'}>
                             {formatCurrency(item.valor)}
                           </span>
