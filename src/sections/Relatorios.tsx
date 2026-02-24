@@ -1,58 +1,142 @@
 import { useState, useMemo } from 'react';
-import { BarChart3, TrendingUp, DollarSign, PieChart } from 'lucide-react';
+import { BarChart3, TrendingUp, DollarSign, PieChart, Calendar, Download, Filter, X, ArrowUpDown, CreditCard, Receipt } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency } from '@/lib/format';
 import { useCalculations } from '@/hooks/useCalculations';
-import { format, parseISO, subMonths, eachMonthOfInterval, endOfMonth } from 'date-fns';
+import { format, parseISO, subMonths, eachMonthOfInterval, endOfMonth, startOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart as RePieChart, Pie, Cell } from 'recharts';
 import { useStorage } from '@/hooks/useStorage';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { toast } from 'sonner';
 
 const COLORS = ['#f472b6', '#60a5fa', '#34d399', '#fbbf24', '#a78bfa', '#f87171', '#22d3ee', '#fb923c'];
+
+type PeriodoType = 'mes' | 'trimestre' | 'semestre' | 'ano' | 'personalizado';
 
 export function Relatorios() {
   const { data } = useStorage();
   
-  const [mesInicio, setMesInicio] = useState(format(subMonths(new Date(), 5), 'yyyy-MM'));
-  const [mesFim, setMesFim] = useState(format(new Date(), 'yyyy-MM'));
+  // Estado para o período selecionado
+  const [periodoSelecionado, setPeriodoSelecionado] = useState<PeriodoType>('mes');
+  const [dataInicio, setDataInicio] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
+  const [dataFim, setDataFim] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
+  const [mostrarFiltrosPersonalizados, setMostrarFiltrosPersonalizados] = useState(false);
+  
   const [activeTab, setActiveTab] = useState('evolucao');
 
-  const { resultadoMensal } = useCalculations(data);
+  const { resultadoMensal, calcularFluxoCaixa } = useCalculations(data);
 
-  // Dados do período
-  const dadosPeriodo = useMemo(() => {
+  // Atualizar datas com base no período selecionado
+  const atualizarPeriodo = (periodo: PeriodoType) => {
+    setPeriodoSelecionado(periodo);
+    const hoje = new Date();
+    
+    switch(periodo) {
+      case 'mes':
+        setDataInicio(format(startOfMonth(hoje), 'yyyy-MM-dd'));
+        setDataFim(format(endOfMonth(hoje), 'yyyy-MM-dd'));
+        setMostrarFiltrosPersonalizados(false);
+        break;
+      case 'trimestre':
+        setDataInicio(format(startOfMonth(subMonths(hoje, 2)), 'yyyy-MM-dd'));
+        setDataFim(format(endOfMonth(hoje), 'yyyy-MM-dd'));
+        setMostrarFiltrosPersonalizados(false);
+        break;
+      case 'semestre':
+        setDataInicio(format(startOfMonth(subMonths(hoje, 5)), 'yyyy-MM-dd'));
+        setDataFim(format(endOfMonth(hoje), 'yyyy-MM-dd'));
+        setMostrarFiltrosPersonalizados(false);
+        break;
+      case 'ano':
+        setDataInicio(format(startOfMonth(subMonths(hoje, 11)), 'yyyy-MM-dd'));
+        setDataFim(format(endOfMonth(hoje), 'yyyy-MM-dd'));
+        setMostrarFiltrosPersonalizados(false);
+        break;
+      case 'personalizado':
+        setMostrarFiltrosPersonalizados(true);
+        break;
+    }
+  };
+
+  // Dados do período mensal para gráficos
+  const dadosMensais = useMemo(() => {
     try {
-      const inicio = parseISO(mesInicio + '-01');
-      const fim = parseISO(mesFim + '-01');
-      const meses = eachMonthOfInterval({ start: inicio, end: fim });
+      const inicio = parseISO(dataInicio);
+      const fim = parseISO(dataFim);
       
-      return meses.map(mesItem => {
-        const res = resultadoMensal(mesItem);
-        return {
-          mes: format(mesItem, 'MMM/yy', { locale: ptBR }),
-          faturamento: res?.faturamento || 0,
-          faturamentoLiquido: res?.faturamentoLiquido || 0,
-          lucro: res?.lucro || 0,
-          despesas: (res?.custosFixos || 0) + (res?.custosVariaveis || 0) + (res?.cmv || 0),
-          cmv: res?.cmv || 0,
-          custosFixos: res?.custosFixos || 0,
-          custosVariaveis: res?.custosVariaveis || 0,
-        };
-      });
+      // Se for período menor que 2 meses, mostrar dias
+      const diffDays = Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (diffDays <= 60) {
+        // Agrupar por dia
+        const dias: Record<string, any> = {};
+        const transacoes = data?.transacoes?.filter(t => {
+          if (!t?.data) return false;
+          const dataTransacao = new Date(t.data);
+          return dataTransacao >= inicio && dataTransacao <= fim;
+        }) || [];
+
+        transacoes.forEach(t => {
+          const dia = format(new Date(t.data), 'dd/MM');
+          if (!dias[dia]) {
+            dias[dia] = {
+              dia,
+              faturamento: 0,
+              despesas: 0,
+              saldo: 0
+            };
+          }
+          if (t.tipo === 'receita') {
+            dias[dia].faturamento += t.valor || 0;
+          } else {
+            dias[dia].despesas += t.valor || 0;
+          }
+          dias[dia].saldo = dias[dia].faturamento - dias[dia].despesas;
+        });
+
+        return Object.values(dias).sort((a, b) => a.dia.localeCompare(b.dia));
+      } else {
+        // Agrupar por mês
+        const meses = eachMonthOfInterval({ start: inicio, end: fim });
+        return meses.map(mesItem => {
+          const res = resultadoMensal(mesItem);
+          return {
+            mes: format(mesItem, 'MMM/yy', { locale: ptBR }),
+            faturamento: res?.faturamento || 0,
+            faturamentoLiquido: res?.faturamentoLiquido || 0,
+            lucro: res?.lucro || 0,
+            despesas: (res?.custosFixos || 0) + (res?.custosVariaveis || 0) + (res?.cmv || 0),
+            cmv: res?.cmv || 0,
+            custosFixos: res?.custosFixos || 0,
+            custosVariaveis: res?.custosVariaveis || 0,
+            receitas: res?.faturamento || 0,
+            despesasTotais: (res?.custosFixos || 0) + (res?.custosVariaveis || 0) + (res?.cmv || 0)
+          };
+        });
+      }
     } catch (error) {
       console.error('Erro ao calcular dados do período:', error);
       return [];
     }
-  }, [mesInicio, mesFim, resultadoMensal]);
+  }, [dataInicio, dataFim, resultadoMensal, data?.transacoes]);
+
+  // Fluxo de caixa
+  const fluxoCaixa = useMemo(() => {
+    return calcularFluxoCaixa(parseISO(dataInicio), parseISO(dataFim));
+  }, [dataInicio, dataFim, calcularFluxoCaixa]);
 
   // Despesas por categoria
   const despesasPorCategoria = useMemo(() => {
     try {
-      const inicio = parseISO(mesInicio + '-01');
-      const fim = endOfMonth(parseISO(mesFim + '-01'));
+      const inicio = parseISO(dataInicio);
+      const fim = endOfMonth(parseISO(dataFim));
       
       const transacoes = data?.transacoes?.filter(t => {
         if (!t?.data) return false;
@@ -74,14 +158,26 @@ export function Relatorios() {
         }
       });
 
-      const custosFixos = data?.configuracoes?.custosFixos?.reduce((acc: number, c: any) => acc + (c?.valor || 0), 0) || 0;
+      // Adicionar custos fixos configurados (rateados por mês)
+      const mesesNoPeriodo = dadosMensais.length || 1;
+      const custosFixos = (data?.configuracoes?.custosFixos || []).reduce((acc: number, c: any) => acc + (c?.valor || 0), 0);
       if (custosFixos > 0) {
-        categorias['custos_fixos'] = { nome: 'Custos Fixos', valor: custosFixos, cor: '#ef4444' };
+        const valorRateado = (custosFixos / 30) * Math.ceil((parseISO(dataFim).getTime() - parseISO(dataInicio).getTime()) / (1000 * 60 * 60 * 24));
+        categorias['custos_fixos'] = { 
+          nome: 'Custos Fixos', 
+          valor: valorRateado, 
+          cor: '#ef4444' 
+        };
       }
 
-      const custosVariaveis = data?.configuracoes?.custosVariaveis?.reduce((acc: number, c: any) => acc + (c?.valor || 0), 0) || 0;
+      const custosVariaveis = (data?.configuracoes?.custosVariaveis || []).reduce((acc: number, c: any) => acc + (c?.valor || 0), 0);
       if (custosVariaveis > 0) {
-        categorias['custos_variaveis'] = { nome: 'Custos Variáveis', valor: custosVariaveis, cor: '#f97316' };
+        const valorRateado = (custosVariaveis / 30) * Math.ceil((parseISO(dataFim).getTime() - parseISO(dataInicio).getTime()) / (1000 * 60 * 60 * 24));
+        categorias['custos_variaveis'] = { 
+          nome: 'Custos Variáveis', 
+          valor: valorRateado, 
+          cor: '#f97316' 
+        };
       }
 
       return Object.values(categorias).sort((a, b) => b.valor - a.valor);
@@ -89,19 +185,120 @@ export function Relatorios() {
       console.error('Erro ao calcular despesas por categoria:', error);
       return [];
     }
-  }, [data?.transacoes, data?.categoriasConta, data?.configuracoes, mesInicio, mesFim]);
+  }, [data?.transacoes, data?.categoriasConta, data?.configuracoes, dataInicio, dataFim, dadosMensais.length]);
 
   // Totais do período
   const totais = useMemo(() => {
-    return dadosPeriodo.reduce((acc, m) => ({
+    if (dadosMensais.length === 0) {
+      return {
+        faturamento: 0,
+        despesas: 0,
+        saldo: 0,
+        custosFixos: 0,
+        custosVariaveis: 0,
+        cmv: 0,
+        ticketMedio: 0,
+        qtdVendas: 0
+      };
+    }
+
+    // Se for dados diários
+    if (dadosMensais[0]?.dia) {
+      const faturamento = dadosMensais.reduce((acc, d) => acc + (d.faturamento || 0), 0);
+      const despesas = dadosMensais.reduce((acc, d) => acc + (d.despesas || 0), 0);
+      const qtdVendas = data?.transacoes?.filter(t => {
+        if (!t?.data) return false;
+        const dataTransacao = new Date(t.data);
+        return t.tipo === 'receita' && dataTransacao >= parseISO(dataInicio) && dataTransacao <= parseISO(dataFim);
+      }).length || 0;
+
+      return {
+        faturamento,
+        despesas,
+        saldo: faturamento - despesas,
+        custosFixos: 0,
+        custosVariaveis: 0,
+        cmv: 0,
+        ticketMedio: qtdVendas > 0 ? faturamento / qtdVendas : 0,
+        qtdVendas
+      };
+    }
+
+    // Se for dados mensais
+    return dadosMensais.reduce((acc, m) => ({
       faturamento: (acc.faturamento || 0) + (m.faturamento || 0),
-      faturamentoLiquido: (acc.faturamentoLiquido || 0) + (m.faturamentoLiquido || 0),
-      lucro: (acc.lucro || 0) + (m.lucro || 0),
+      despesas: (acc.despesas || 0) + (m.despesas || 0),
+      saldo: (acc.saldo || 0) + (m.lucro || 0),
       custosFixos: (acc.custosFixos || 0) + (m.custosFixos || 0),
       custosVariaveis: (acc.custosVariaveis || 0) + (m.custosVariaveis || 0),
       cmv: (acc.cmv || 0) + (m.cmv || 0),
-    }), { faturamento: 0, faturamentoLiquido: 0, lucro: 0, custosFixos: 0, custosVariaveis: 0, cmv: 0 });
-  }, [dadosPeriodo]);
+    }), { 
+      faturamento: 0, 
+      despesas: 0, 
+      saldo: 0, 
+      custosFixos: 0, 
+      custosVariaveis: 0, 
+      cmv: 0 
+    });
+  }, [dadosMensais, data?.transacoes, dataInicio, dataFim]);
+
+  // Exportar relatório em PDF
+  const handleExportPDF = () => {
+    try {
+      const doc = new jsPDF();
+      
+      // Título
+      doc.setFontSize(18);
+      doc.text('Relatório Financeiro', 14, 22);
+      
+      // Período
+      doc.setFontSize(11);
+      doc.text(`Período: ${format(parseISO(dataInicio), 'dd/MM/yyyy')} a ${format(parseISO(dataFim), 'dd/MM/yyyy')}`, 14, 32);
+      
+      // Totais
+      doc.setFontSize(12);
+      doc.text('Resumo do Período', 14, 45);
+      
+      autoTable(doc, {
+        startY: 50,
+        head: [['Indicador', 'Valor']],
+        body: [
+          ['Faturamento Total', formatCurrency(totais.faturamento)],
+          ['Despesas Totais', formatCurrency(totais.despesas)],
+          ['Saldo', formatCurrency(totais.saldo)],
+          ['CMV Total', formatCurrency(totais.cmv)],
+          ['Custos Fixos', formatCurrency(totais.custosFixos)],
+          ['Custos Variáveis', formatCurrency(totais.custosVariaveis)],
+        ],
+      });
+      
+      // Despesas por categoria
+      if (despesasPorCategoria.length > 0) {
+        const finalY = (doc as any).lastAutoTable.finalY || 100;
+        doc.text('Despesas por Categoria', 14, finalY + 15);
+        
+        autoTable(doc, {
+          startY: finalY + 20,
+          head: [['Categoria', 'Valor']],
+          body: despesasPorCategoria.map(cat => [cat.nome, formatCurrency(cat.valor)]),
+        });
+      }
+      
+      // Salvar PDF
+      doc.save(`relatorio_${format(new Date(), 'yyyyMMdd')}.pdf`);
+      toast.success('Relatório exportado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao exportar PDF:', error);
+      toast.error('Erro ao exportar relatório');
+    }
+  };
+
+  const limparFiltros = () => {
+    setPeriodoSelecionado('mes');
+    setDataInicio(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
+    setDataFim(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
+    setMostrarFiltrosPersonalizados(false);
+  };
 
   return (
     <div className="space-y-6">
@@ -109,29 +306,70 @@ export function Relatorios() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Relatórios</h2>
-          <p className="text-gray-500">Análise financeira simplificada</p>
+          <p className="text-gray-500">Análise financeira completa</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExportPDF}>
+            <Download className="w-4 h-4 mr-2" />
+            Exportar PDF
+          </Button>
         </div>
       </div>
 
       {/* Filtros */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4 items-end">
-            <div>
-              <Label>Mês Início</Label>
-              <Input
-                type="month"
-                value={mesInicio}
-                onChange={(e) => setMesInicio(e.target.value)}
-              />
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-gray-500" />
+              <span className="font-medium">Período</span>
             </div>
-            <div>
-              <Label>Mês Fim</Label>
-              <Input
-                type="month"
-                value={mesFim}
-                onChange={(e) => setMesFim(e.target.value)}
-              />
+            
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Select value={periodoSelecionado} onValueChange={(v: PeriodoType) => atualizarPeriodo(v)}>
+                <SelectTrigger className="w-full sm:w-48">
+                  <SelectValue placeholder="Selecionar período" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="mes">Este mês</SelectItem>
+                  <SelectItem value="trimestre">Últimos 3 meses</SelectItem>
+                  <SelectItem value="semestre">Últimos 6 meses</SelectItem>
+                  <SelectItem value="ano">Últimos 12 meses</SelectItem>
+                  <SelectItem value="personalizado">Personalizado</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {mostrarFiltrosPersonalizados && (
+                <div className="flex flex-col sm:flex-row gap-2 flex-1">
+                  <div className="flex-1">
+                    <Label className="text-xs">Data Início</Label>
+                    <Input
+                      type="date"
+                      value={dataInicio}
+                      onChange={(e) => setDataInicio(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <Label className="text-xs">Data Fim</Label>
+                    <Input
+                      type="date"
+                      value={dataFim}
+                      onChange={(e) => setDataFim(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={limparFiltros}>
+                <X className="w-4 h-4 mr-1" />
+                Limpar filtro
+              </Button>
+              <Button size="sm" className="bg-gradient-to-r from-pink-500 to-rose-500">
+                <Filter className="w-4 h-4 mr-1" />
+                Atualizar
+              </Button>
             </div>
           </div>
         </CardContent>
@@ -145,22 +383,25 @@ export function Relatorios() {
             <p className="text-2xl font-bold text-blue-700">{formatCurrency(totais.faturamento)}</p>
           </CardContent>
         </Card>
-        <Card className={`${(totais.lucro || 0) >= 0 ? 'bg-gradient-to-br from-emerald-50 to-green-50' : 'bg-gradient-to-br from-red-50 to-rose-50'}`}>
-          <CardContent className="p-4">
-            <p className={`text-sm font-medium ${(totais.lucro || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-              {(totais.lucro || 0) >= 0 ? 'Lucro Total' : 'Prejuízo Total'}
-            </p>
-            <p className={`text-2xl font-bold ${(totais.lucro || 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-              {formatCurrency(Math.abs(totais.lucro || 0))}
-            </p>
-          </CardContent>
-        </Card>
+        
         <Card className="bg-gradient-to-br from-orange-50 to-amber-50">
           <CardContent className="p-4">
-            <p className="text-sm text-orange-600 font-medium">Custos Fixos</p>
-            <p className="text-2xl font-bold text-orange-700">{formatCurrency(totais.custosFixos)}</p>
+            <p className="text-sm text-orange-600 font-medium">Despesas Totais</p>
+            <p className="text-2xl font-bold text-orange-700">{formatCurrency(totais.despesas)}</p>
           </CardContent>
         </Card>
+        
+        <Card className={`${(totais.saldo || 0) >= 0 ? 'bg-gradient-to-br from-emerald-50 to-green-50' : 'bg-gradient-to-br from-red-50 to-rose-50'}`}>
+          <CardContent className="p-4">
+            <p className={`text-sm font-medium ${(totais.saldo || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+              Saldo do Período
+            </p>
+            <p className={`text-2xl font-bold ${(totais.saldo || 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+              {formatCurrency(Math.abs(totais.saldo || 0))}
+            </p>
+          </CardContent>
+        </Card>
+        
         <Card className="bg-gradient-to-br from-purple-50 to-violet-50">
           <CardContent className="p-4">
             <p className="text-sm text-purple-600 font-medium">CMV Total</p>
@@ -169,9 +410,36 @@ export function Relatorios() {
         </Card>
       </div>
 
+      {/* Cards adicionais para fluxo de caixa */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-green-500" />
+                <span className="font-medium">Total de Vendas</span>
+              </div>
+              <span className="text-2xl font-bold text-green-600">{fluxoCaixa?.totalVendas || 0}</span>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Receipt className="w-5 h-5 text-red-500" />
+                <span className="font-medium">Total de Despesas</span>
+              </div>
+              <span className="text-2xl font-bold text-red-600">{fluxoCaixa?.totalDespesas || 0}</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="evolucao" className="flex items-center gap-1">
             <BarChart3 className="w-4 h-4" />
             <span className="hidden sm:inline">Evolução</span>
@@ -184,20 +452,24 @@ export function Relatorios() {
             <TrendingUp className="w-4 h-4" />
             <span className="hidden sm:inline">Tendência</span>
           </TabsTrigger>
+          <TabsTrigger value="fluxo" className="flex items-center gap-1">
+            <ArrowUpDown className="w-4 h-4" />
+            <span className="hidden sm:inline">Fluxo de Caixa</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="evolucao" className="mt-4">
           <Card>
             <CardHeader>
-              <CardTitle>Evolução Mensal</CardTitle>
+              <CardTitle>Evolução {dadosMensais[0]?.dia ? 'Diária' : 'Mensal'}</CardTitle>
             </CardHeader>
             <CardContent>
-              {dadosPeriodo.length > 0 ? (
+              {dadosMensais.length > 0 ? (
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={dadosPeriodo}>
+                    <BarChart data={dadosMensais}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis dataKey="mes" stroke="#6b7280" />
+                      <XAxis dataKey={dadosMensais[0]?.dia ? "dia" : "mes"} stroke="#6b7280" />
                       <YAxis stroke="#6b7280" tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
                       <Tooltip 
                         formatter={(v: number) => formatCurrency(v)}
@@ -205,7 +477,7 @@ export function Relatorios() {
                       />
                       <Bar dataKey="faturamento" name="Faturamento" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                       <Bar dataKey="lucro" name="Lucro" fill="#10b981" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="despesas" name="Custos" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="despesas" name="Despesas" fill="#ef4444" radius={[4, 4, 0, 0]} />
                       <Legend />
                     </BarChart>
                   </ResponsiveContainer>
@@ -277,14 +549,14 @@ export function Relatorios() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-emerald-500" />
-                Tendência de Lucro
+                Tendência de Resultados
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {dadosPeriodo.length > 0 ? (
+              {dadosMensais.length > 0 && !dadosMensais[0]?.dia ? (
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={dadosPeriodo}>
+                    <LineChart data={dadosMensais}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                       <XAxis dataKey="mes" stroke="#6b7280" />
                       <YAxis stroke="#6b7280" tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
@@ -300,7 +572,56 @@ export function Relatorios() {
                   </ResponsiveContainer>
                 </div>
               ) : (
-                <p className="text-gray-500 text-center py-8">Nenhum dado disponível para o período</p>
+                <p className="text-gray-500 text-center py-8">Dados diários não disponíveis para tendência mensal</p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="fluxo" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ArrowUpDown className="w-5 h-5 text-blue-500" />
+                Fluxo de Caixa Detalhado
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {fluxoCaixa && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="p-4 bg-green-50 rounded-lg">
+                      <p className="text-sm text-green-600">Entradas</p>
+                      <p className="text-xl font-bold text-green-700">{formatCurrency(fluxoCaixa.entradas)}</p>
+                    </div>
+                    <div className="p-4 bg-red-50 rounded-lg">
+                      <p className="text-sm text-red-600">Saídas</p>
+                      <p className="text-xl font-bold text-red-700">{formatCurrency(fluxoCaixa.saidas)}</p>
+                    </div>
+                    <div className={`p-4 rounded-lg ${fluxoCaixa.saldo >= 0 ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+                      <p className={`text-sm ${fluxoCaixa.saldo >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        Saldo
+                      </p>
+                      <p className={`text-xl font-bold ${fluxoCaixa.saldo >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                        {formatCurrency(Math.abs(fluxoCaixa.saldo))}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-4">
+                    <h4 className="font-medium mb-2">Detalhamento</h4>
+                    <div className="space-y-2">
+                      {fluxoCaixa.detalhamento?.map((item, idx) => (
+                        <div key={idx} className="flex justify-between p-2 bg-gray-50 rounded">
+                          <span>{item.descricao}</span>
+                          <span className={item.tipo === 'entrada' ? 'text-green-600' : 'text-red-600'}>
+                            {formatCurrency(item.valor)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>
